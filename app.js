@@ -14,10 +14,12 @@ app.use(express.urlencoded({ extended: true }));
 const authRoutes = require('./routes/auth');
 const bookRoutes = require('./routes/books');
 const borrowingRoutes = require('./routes/borrowing');
+const roomRoutes = require('./routes/rooms');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/borrowing', borrowingRoutes);
+app.use('/api/rooms', roomRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
