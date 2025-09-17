@@ -1,0 +1,19 @@
+# Dependencies
+# Jangan upload folder ini karena ukurannya sangat besar
+/node_modules
+
+# Secrets and Environment Variables
+# JANGAN PERNAH UPLOAD FILE INI KARENA BERISI PASSWORD
+.env
+
+# Logs
+# Abaikan file log yang mungkin dibuat saat error
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating System Files
+.DS_Store
+Thumbs.db
