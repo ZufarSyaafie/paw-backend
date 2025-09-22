@@ -1,68 +1,61 @@
+// middleware/auth.js
 const jwt = require('jsonwebtoken');
+// NOTE: middleware/ berada sejajar dengan folder models/, jadi path ke User harus ../models/User
 const User = require('../models/User');
 
-// Middleware untuk verify JWT token
 const authenticateToken = async (req, res, next) => {
   try {
-    // Ambil token dari header Authorization
-    const authHeader = req.headers['authorization'];
-    console.log(authHeader);
-    const token = authHeader; // Bearer TOKEN
-    console.log(token);
+    // Ambil header Authorization (berformat "Bearer <token>")
+    const authHeader = req.headers && (req.headers.authorization || req.headers.Authorization);
+    if (!authHeader) {
+      return res.status(401).json({ success: false, message: 'Access token is required' });
+    }
+
+    // Support "Bearer TOKEN" atau langsung token
+    const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : authHeader;
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access token is required'
-      });
+      return res.status(401).json({ success: false, message: 'Access token is required' });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Cari user berdasarkan ID dari token
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not set — token verification may fail.');
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ success: false, message: 'Token expired' });
+      }
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    // decoded expected to have userId
     const user = await User.findById(decoded.userId).select('-password');
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(401).json({ success: false, message: 'User not found' });
     }
 
-    // Attach user ke request object
     req.user = user;
     next();
 
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    console.error('authenticateToken error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
-// Middleware untuk cek role admin
+// requireAdmin middleware: gunakan role 'admin' dari user.role
 const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
   if (req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Admin access required'
-    });
+    return res.status(403).json({ success: false, message: 'Access denied. Admin required' });
   }
   next();
 };

@@ -1,22 +1,28 @@
+// routes/borrowing.js
 const express = require('express');
 const Borrowing = require('../models/Borrowing');
 const Book = require('../models/Book');
 const { authenticateToken } = require('../middleware/auth');
+
+// import validation & logger middlewares from correct files
 const {
   validateBorrowRequest,
   checkBookAvailability,
   checkUserBorrowingLimits,
   validateReturnRequest,
-  calculateBorrowingCosts,
-  logBorrowingActivity
-} = require('../middleware/borrowing');
+  calculateBorrowingCosts
+} = require('../middleware/borrowingValidation');
+
+const { logBorrowingActivity } = require('../middleware/borrowingLogger');
+
 const { calculateDueDate, formatDateTime } = require('../utils/dateUtils');
 const { calculateTotalCost } = require('../utils/fineCalculator');
 
 const router = express.Router();
 
-// POST /api/borrowing/borrow - Pinjam Buku
-router.post('/borrow', 
+// POST /api/borrowing/borrow - Pinjam Buku (atomic stock update)
+router.post(
+  '/borrow',
   authenticateToken,
   logBorrowingActivity('BORROW'),
   validateBorrowRequest,
@@ -28,6 +34,17 @@ router.post('/borrow',
       const { borrowType } = req.validatedData;
       const user = req.user;
       const book = req.book;
+
+      // Atomic decrement: ensure availableStock > 0
+      const updatedBook = await Book.findOneAndUpdate(
+        { _id: book._id, availableStock: { $gt: 0 } },
+        { $inc: { availableStock: -1, borrowCount: 1 } },
+        { new: true }
+      );
+
+      if (!updatedBook) {
+        return res.status(400).json({ success: false, message: 'Buku sudah tidak tersedia' });
+      }
 
       // Calculate due date
       const borrowDate = new Date();
@@ -44,20 +61,17 @@ router.post('/borrow',
           extendedPeriod: user.isMember,
           reducedFine: user.isMember,
           priorityAccess: user.isMember
+        },
+        commitmentFee: {
+          amount: book.borrowingRules ? book.borrowingRules.commitmentFee : (process.env.COMMITMENT_FEE ? parseInt(process.env.COMMITMENT_FEE) : 25000),
+          status: 'Pending'
         }
       });
 
       await borrowing.save();
 
-      // Update book stock
-      book.availableStock -= 1;
-      await book.save();
-
-      // Populate untuk response
-      await borrowing.populate([
-        { path: 'book', select: 'title author category' },
-        { path: 'user', select: 'name email isMember' }
-      ]);
+      // Populate for response
+      await borrowing.populate([{ path: 'book', select: 'title author category' }, { path: 'user', select: 'name email isMember' }]);
 
       res.status(201).json({
         success: true,
@@ -79,25 +93,27 @@ router.post('/borrow',
           instructions: {
             commitmentFee: `Bayar commitment fee Rp ${borrowing.commitmentFee.amount.toLocaleString('id-ID')}`,
             dueDate: `Batas pengembalian: ${formatDateTime(dueDate)}`,
-            reminder: borrowType === 'Bawa Pulang' ? 
-              'Jangan lupa kembalikan tepat waktu untuk menghindari denda' :
-              'Waktu membaca minimal 1 jam'
+            reminder: borrowType === 'Bawa Pulang' ? 'Jangan lupa kembalikan tepat waktu untuk menghindari denda' : 'Waktu membaca minimal 1 jam'
           }
         }
       });
-
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error saat meminjam buku',
-        error: error.message
-      });
+      // If we failed after decrement, try to rollback availableStock increment (best-effort)
+      try {
+        if (req.book && req.book._id) {
+          await Book.findByIdAndUpdate(req.book._id, { $inc: { availableStock: 1 } });
+        }
+      } catch (e) {
+        console.error('Rollback failed:', e);
+      }
+      res.status(500).json({ success: false, message: 'Server error saat meminjam buku', error: error.message });
     }
   }
 );
 
 // POST /api/borrowing/return - Kembalikan Buku
-router.post('/return',
+router.post(
+  '/return',
   authenticateToken,
   logBorrowingActivity('RETURN'),
   validateReturnRequest,
@@ -106,24 +122,14 @@ router.post('/return',
       const borrowing = req.borrowing;
       const returnDate = new Date();
 
-      // Update overdue status
       await borrowing.updateOverdueStatus();
 
-      // Calculate costs
-      const totalCost = calculateTotalCost(
-        borrowing.borrowType,
-        borrowing.dueDate,
-        returnDate,
-        borrowing.memberBenefits.reducedFine
-      );
+      const totalCost = calculateTotalCost(borrowing.borrowType, borrowing.dueDate, returnDate, borrowing.memberBenefits.reducedFine);
 
-      // Return book
       await borrowing.returnBook();
 
-      // Update book stock
-      const book = await Book.findById(borrowing.book._id);
-      book.availableStock += 1;
-      await book.save();
+      // Atomic increment book availableStock
+      await Book.findByIdAndUpdate(borrowing.book._id, { $inc: { availableStock: 1 } });
 
       res.json({
         success: true,
@@ -138,23 +144,16 @@ router.post('/return',
             status: borrowing.status
           },
           costs: totalCost,
-          nextSteps: totalCost.totalCost > 0 ? 
-            'Silakan bayar denda keterlambatan' :
-            'Commitment fee akan dikembalikan'
+          nextSteps: totalCost.totalCost > 0 ? 'Silakan bayar denda keterlambatan' : 'Commitment fee akan dikembalikan'
         }
       });
-
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Server error saat mengembalikan buku',
-        error: error.message
-      });
+      res.status(500).json({ success: false, message: 'Server error saat mengembalikan buku', error: error.message });
     }
   }
 );
 
-// GET /api/borrowing/my-borrowings - Daftar Peminjaman User
+// GET /api/borrowing/my-borrowings
 router.get('/my-borrowings', authenticateToken, async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
@@ -173,11 +172,7 @@ router.get('/my-borrowings', authenticateToken, async (req, res) => {
 
     const formattedBorrowings = borrowings.map(borrowing => ({
       id: borrowing._id,
-      book: {
-        title: borrowing.book.title,
-        author: borrowing.book.author,
-        category: borrowing.book.category
-      },
+      book: { title: borrowing.book.title, author: borrowing.book.author, category: borrowing.book.category },
       borrowType: borrowing.borrowType,
       borrowDate: borrowing.borrowDate,
       dueDate: borrowing.dueDate,
@@ -191,57 +186,29 @@ router.get('/my-borrowings', authenticateToken, async (req, res) => {
       message: 'Daftar peminjaman berhasil diambil',
       data: {
         borrowings: formattedBorrowings,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalBorrowings: total
-        }
+        pagination: { currentPage: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)), totalBorrowings: total }
       }
     });
-
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
-// GET /api/borrowing/active - Peminjaman Aktif User
+// GET /api/borrowing/active
 router.get('/active', authenticateToken, async (req, res) => {
   try {
     const activeBorrowings = await Borrowing.getActiveBorrowings(req.user._id);
-
-    const formattedBorrowings = activeBorrowings.map(borrowing => ({
-      id: borrowing._id,
-      book: {
-        title: borrowing.book.title,
-        author: borrowing.book.author
-      },
-      borrowType: borrowing.borrowType,
-      borrowDate: borrowing.borrowDate,
-      dueDate: borrowing.dueDate,
-      status: borrowing.status
+    const formatted = activeBorrowings.map(b => ({
+      id: b._id,
+      book: { title: b.book.title, author: b.book.author },
+      borrowType: b.borrowType,
+      borrowDate: b.borrowDate,
+      dueDate: b.dueDate,
+      status: b.status
     }));
-
-    res.json({
-      success: true,
-      message: 'Peminjaman aktif berhasil diambil',
-      data: {
-        activeBorrowings: formattedBorrowings,
-        summary: {
-          totalActive: formattedBorrowings.length
-        }
-      }
-    });
-
+    res.json({ success: true, message: 'Peminjaman aktif berhasil diambil', data: { activeBorrowings: formatted, summary: { totalActive: formatted.length } } });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 

@@ -1,35 +1,30 @@
 const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
-  name: {
+  roomName: {
     type: String,
     required: true,
-    unique: true
-  },
-  type: {
-    type: String,
-    enum: ['Diskusi Kecil', 'Pertemuan Besar'],
-    required: true
+    unique: true,
   },
   capacity: {
     type: Number,
-    required: true
-  },
-  facilities: [{
-    type: String
-  }],
-  hourlyRate: {
-    type: Number,
-    required: true
-  },
-  photo: {
-    type: String,
-    default: 'default-room.jpg'
+    required: true,
   },
   isAvailable: {
     type: Boolean,
-    default: true
-  }
-}, { timestamps: true });
+    default: true,
+  },
+  lastBookedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  lastBookedAt: {
+    type: Date,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 module.exports = mongoose.model('Room', roomSchema);

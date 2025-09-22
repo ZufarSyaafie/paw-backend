@@ -1,80 +1,37 @@
-// Konstanta biaya
+// utils/fineCalculator.js
+const moment = require('moment');
+
 const FEES = {
-  COMMITMENT_FEE: 25000, // Rp 25.000
-  FINE_PER_DAY: 5000,    // Rp 5.000 per hari
-  MEMBER_DISCOUNT: 0.5,   // 50% discount untuk member
-  MAX_FINE: 100000       // Max fine Rp 100.000
+  COMMITMENT_FEE: parseInt(process.env.COMMITMENT_FEE || '25000', 10),
+  FINE_PER_DAY: parseInt(process.env.FINE_PER_DAY || '5000', 10),
+  MEMBER_DISCOUNT: 0.5,
+  MAX_FINE: parseInt(process.env.MAX_FINE || '100000', 10)
 };
 
-// Hitung total biaya peminjaman
-const calculateTotalCost = (borrowType, dueDate, returnDate, isMember = false) => {
-  const commitment = FEES.COMMITMENT_FEE;
-  
-  // Hitung overdue days
-  const today = new Date(returnDate);
-  const due = new Date(dueDate);
-  const diffTime = today - due;
-  const overdueDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  let fineAmount = 0;
-  if (overdueDays > 0) {
-    let finePerDay = FEES.FINE_PER_DAY;
-    if (isMember) {
-      finePerDay = finePerDay * (1 - FEES.MEMBER_DISCOUNT);
-    }
-    fineAmount = overdueDays * finePerDay;
-    if (fineAmount > FEES.MAX_FINE) {
-      fineAmount = FEES.MAX_FINE;
-    }
+function calculateFine(dueAt, returnAt = null, isMember = false) {
+  if (!dueAt) return 0;
+  const now = returnAt ? moment(returnAt) : moment();
+  const due = moment(dueAt);
+  const daysLate = now.diff(due, 'days');
+  if (daysLate <= 0) return 0;
+  const perDay = isMember ? Math.round(FEES.FINE_PER_DAY * (1 - FEES.MEMBER_DISCOUNT)) : FEES.FINE_PER_DAY;
+  return Math.min(daysLate * perDay, FEES.MAX_FINE);
+}
+
+function estimateBorrowCost(borrowType, borrowDate = new Date(), isMember = false) {
+  const borrow = new Date(borrowDate);
+  const due = new Date(borrow);
+  if (borrowType === 'Baca di Tempat') {
+    due.setHours(due.getHours() + 1);
+  } else {
+    due.setDate(due.getDate() + (isMember ? 21 : 14));
+    due.setHours(23, 59, 59, 999);
   }
-  
-  let total = commitment + fineAmount;
-  let refund = 0;
-  
-  // Jika tidak ada denda, commitment fee akan dikembalikan
-  if (fineAmount === 0) {
-    refund = commitment;
-    total = 0;
-  }
-  
   return {
-    commitmentFee: commitment,
-    lateFine: fineAmount,
-    totalCost: total,
-    refund: refund,
-    summary: total === 0 ? 
-      'Commitment fee akan dikembalikan' : 
-      `Total biaya: Rp ${total.toLocaleString('id-ID')}`
+    commitmentFee: FEES.COMMITMENT_FEE,
+    dueDate: due,
+    finePerDay: isMember ? Math.round(FEES.FINE_PER_DAY * (1 - FEES.MEMBER_DISCOUNT)) : FEES.FINE_PER_DAY
   };
-};
+}
 
-// Hitung estimasi biaya sebelum meminjam
-const estimateBorrowCost = (borrowType, borrowDate, isMember = false) => {
-  const { calculateDueDate } = require('./dateUtils');
-  
-  const dueDate = calculateDueDate(borrowType, isMember, borrowDate);
-  const commitmentFee = FEES.COMMITMENT_FEE;
-  
-  return {
-    onTime: {
-      commitmentFee,
-      lateFine: 0,
-      totalCost: 0,
-      refund: commitmentFee,
-      dueDate,
-      message: 'Jika dikembalikan tepat waktu, commitment fee akan dikembalikan'
-    },
-    feeStructure: {
-      commitmentFee: FEES.COMMITMENT_FEE,
-      finePerDay: isMember ? FEES.FINE_PER_DAY * (1 - FEES.MEMBER_DISCOUNT) : FEES.FINE_PER_DAY,
-      memberBenefit: isMember ? 'Discount 50% untuk denda' : 'Tidak ada discount',
-      maxFine: FEES.MAX_FINE
-    }
-  };
-};
-
-module.exports = {
-  FEES,
-  calculateTotalCost,
-  estimateBorrowCost
-};
+module.exports = { FEES, calculateFine, estimateBorrowCost };

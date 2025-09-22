@@ -1,10 +1,13 @@
+// routes/books.js
 const express = require('express');
-const Book = require('../models/Book');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
-
 const router = express.Router();
 
-// GET /api/books - Halaman Daftar Buku (Public)
+// dari routes/ ke models/ adalah ../models/Book
+const Book = require('../models/Book');
+// middleware path relatif ke routes/ => ../middleware/auth
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
+
+// GET /api/books
 router.get('/', async (req, res) => {
   try {
     const {
@@ -20,54 +23,50 @@ router.get('/', async (req, res) => {
 
     // Build filter object
     const filters = {};
-    
+
     if (category) filters.category = category;
     if (author) filters.author = { $regex: author, $options: 'i' };
     if (year) {
-      filters['details.publishDate'] = {
-        $gte: new Date(year, 0, 1),
-        $lt: new Date(parseInt(year) + 1, 0, 1)
-      };
+      const y = parseInt(year, 10);
+      if (!Number.isNaN(y)) {
+        filters['details.publishDate'] = {
+          $gte: new Date(y, 0, 1),
+          $lt: new Date(y + 1, 0, 1)
+        };
+      }
     }
     if (available === 'true') {
       filters.availableStock = { $gt: 0 };
       filters.status = 'Tersedia';
     }
 
-    // Search query
-    let query = Book.find(filters);
-    
-    if (search) {
-      query = Book.find({
-        ...filters,
-        $text: { $search: search }
-      });
+    // Jika ada search, tambahkan $text (pastikan index text sudah ada di model jika mau full text)
+    if (search && search.trim().length > 0) {
+      filters.$text = { $search: search.trim() };
     }
 
-    // Sorting options
+    // Sorting options (fallback ke title)
     const sortOptions = {
-      'title': { title: 1 },
-      'author': { author: 1 },
-      'year': { 'details.publishDate': -1 },
-      'category': { category: 1, title: 1 },
-      'popularity': { popularity: -1 },
-      'rating': { averageRating: -1 },
-      'newest': { addedToCollectionDate: -1 }
+      title: { title: 1 },
+      author: { author: 1 },
+      year: { 'details.publishDate': -1 },
+      category: { category: 1, title: 1 },
+      popularity: { popularity: -1 },
+      rating: { averageRating: -1 },
+      newest: { addedToCollectionDate: -1 }
     };
 
-    // Execute query with pagination
-    const books = await query
+    const query = Book.find(filters)
+      .select('-reviews')
       .sort(sortOptions[sortBy] || sortOptions.title)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .select('-reviews') // Exclude reviews untuk performance
+      .limit(Math.min(100, parseInt(limit, 10)))
+      .skip((Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, parseInt(limit, 10)))
       .lean();
 
-    // Count total for pagination
-    const total = await Book.countDocuments(search ? 
-      { ...filters, $text: { $search: search } } : 
-      filters
-    );
+    const [books, total] = await Promise.all([
+      query.exec(),
+      Book.countDocuments(filters)
+    ]);
 
     res.json({
       success: true,
@@ -75,310 +74,80 @@ router.get('/', async (req, res) => {
       data: {
         books,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
+          currentPage: parseInt(page, 10),
+          totalPages: Math.ceil(total / Math.min(100, parseInt(limit, 10))),
           totalBooks: total,
-          hasNext: page * limit < total,
-          hasPrev: page > 1
+          hasNext: (parseInt(page, 10) * Math.min(100, parseInt(limit, 10))) < total,
+          hasPrev: parseInt(page, 10) > 1
         },
-        filters: {
-          category,
-          author,
-          search,
-          sortBy,
-          year,
-          available
-        }
+        filters: { category, author, search, sortBy, year, available }
       }
     });
 
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    console.error('GET /api/books error', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
-// GET /api/books/search-suggestions - Auto-suggestion untuk pencarian
-router.get('/search-suggestions', async (req, res) => {
+// POST /api/books - tambah (admin)
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { q } = req.query;
-    
-    if (!q || q.length < 2) {
-      return res.json({
-        success: true,
-        data: { suggestions: [] }
-      });
+    const bookData = req.body;
+    // minimal validation
+    if (!bookData.title || !bookData.author || !bookData.details || !bookData.details.isbn) {
+      return res.status(400).json({ success: false, message: 'title, author, details.isbn required' });
     }
-
-    const suggestions = await Book.getSearchSuggestions(q, 10);
-    
-    res.json({
-      success: true,
-      data: { suggestions }
-    });
-
+    const book = new Book(bookData);
+    await book.save();
+    res.status(201).json({ success: true, message: 'Buku berhasil ditambahkan', data: { book } });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    console.error('POST /api/books error', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Duplicate key (possible ISBN already exists)' });
+    }
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
-// GET /api/books/new-arrivals - Buku-buku baru (untuk pengumuman)
-router.get('/new-arrivals', async (req, res) => {
-  try {
-    const { days = 30 } = req.query;
-    
-    const newBooks = await Book.getNewArrivals(parseInt(days));
-    
-    res.json({
-      success: true,
-      message: 'Buku-buku terbaru berhasil diambil',
-      data: { books: newBooks }
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-});
-
-// GET /api/books/popular - Buku populer
-router.get('/popular', async (req, res) => {
-  try {
-    const popularBooks = await Book.find({
-      status: 'Tersedia'
-    })
-    .sort({ popularity: -1, borrowCount: -1 })
-    .limit(10)
-    .select('-reviews')
-    .lean();
-
-    res.json({
-      success: true,
-      message: 'Buku populer berhasil diambil',
-      data: { books: popularBooks }
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-});
-
-// GET /api/books/:id - Detail Buku (Public)
+// GET /api/books/:id
 router.get('/:id', async (req, res) => {
   try {
     const book = await Book.findById(req.params.id)
       .populate('reviews.user', 'name isMember')
       .lean();
-
-    if (!book) {
-      return res.status(404).json({
-        success: false,
-        message: 'Buku tidak ditemukan'
-      });
-    }
-
-    // Increment view count (tanpa await untuk performance)
-    Book.findByIdAndUpdate(req.params.id, { 
-      $inc: { viewCount: 1 } 
-    }).exec();
-
-    res.json({
-      success: true,
-      message: 'Detail buku berhasil diambil',
-      data: { book }
-    });
-
+    if (!book) return res.status(404).json({ success: false, message: 'Buku tidak ditemukan' });
+    // fire-and-forget increment
+    Book.findByIdAndUpdate(req.params.id, { $inc: { viewCount: 1 } }).exec();
+    res.json({ success: true, message: 'Detail buku berhasil diambil', data: { book } });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    console.error('GET /api/books/:id error', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
-// POST /api/books - Tambah Buku (Admin Only)
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const bookData = req.body;
-    
-    // Validasi required fields
-    const requiredFields = [
-      'title', 'author', 'description', 'category', 'rackLocation',
-      'totalStock', 'availableStock'
-    ];
-    
-    for (let field of requiredFields) {
-      if (!bookData[field]) {
-        return res.status(400).json({
-          success: false,
-          message: `Field ${field} wajib diisi`
-        });
-      }
-    }
-
-    // Validasi detail fields
-    if (!bookData.details) {
-      return res.status(400).json({
-        success: false,
-        message: 'Detail buku wajib diisi'
-      });
-    }
-
-    const book = new Book(bookData);
-    await book.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Buku berhasil ditambahkan',
-      data: { book }
-    });
-
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'ISBN sudah terdaftar'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-});
-
-// PUT /api/books/:id - Update Buku (Admin Only)
+// PUT /api/books/:id - update (admin)
 router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const book = await Book.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!book) {
-      return res.status(404).json({
-        success: false,
-        message: 'Buku tidak ditemukan'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Buku berhasil diupdate',
-      data: { book }
-    });
-
+    const book = await Book.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!book) return res.status(404).json({ success: false, message: 'Buku tidak ditemukan' });
+    res.json({ success: true, message: 'Buku berhasil diupdate', data: { book } });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'ISBN sudah terdaftar'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
+    console.error('PUT /api/books/:id error', error);
+    if (error.code === 11000) return res.status(400).json({ success: false, message: 'Duplicate key' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
-// DELETE /api/books/:id - Hapus Buku (Admin Only)
+// DELETE /api/books/:id
 router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const book = await Book.findByIdAndDelete(req.params.id);
-
-    if (!book) {
-      return res.status(404).json({
-        success: false,
-        message: 'Buku tidak ditemukan'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Buku berhasil dihapus',
-      data: { deletedBook: book.title }
-    });
-
+    if (!book) return res.status(404).json({ success: false, message: 'Buku tidak ditemukan' });
+    res.json({ success: true, message: 'Buku berhasil dihapus', data: { deletedBook: book.title } });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: error.message
-    });
-  }
-});
-
-// POST /api/books/:id/reviews - Tambah Ulasan (Auth Required)
-router.post('/:id/reviews', authenticateToken, async (req, res) => {
-  try {
-    const { rating, comment } = req.body;
-
-    if (!rating || !comment) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rating dan komentar wajib diisi'
-      });
-    }
-
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rating harus antara 1-5'
-      });
-    }
-
-    const book = await Book.findById(req.params.id);
-    if (!book) {
-      return res.status(404).json({
-        success: false,
-        message: 'Buku tidak ditemukan'
-      });
-    }
-
-    await book.addReview(
-      req.user._id,
-      req.user.name,
-      rating,
-      comment
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'Ulasan berhasil ditambahkan',
-      data: {
-        rating,
-        comment,
-        averageRating: book.averageRating,
-        totalReviews: book.totalReviews
-      }
-    });
-
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    console.error('DELETE /api/books/:id error', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
