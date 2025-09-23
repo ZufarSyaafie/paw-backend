@@ -6,9 +6,9 @@ const authenticateToken = async (req, res, next) => {
   try {
     // Ambil token dari header Authorization
     const authHeader = req.headers['authorization'];
-    console.log(authHeader);
-    const token = authHeader; // Bearer TOKEN
-    console.log(token);
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.slice(7) 
+      : authHeader;
 
     if (!token) {
       return res.status(401).json({

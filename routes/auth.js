@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -351,6 +351,16 @@ router.post('/upgrade-membership', authenticateToken, async (req, res) => {
       error: error.message
     });
   }
+});
+
+// CONTOH PENGGUNAAN YANG BENAR
+// Gunakan 'authenticateToken', bukan 'requireAuth' atau nama lain
+router.get('/profile', authenticateToken, (req, res) => {
+  // logika untuk mendapatkan profil user
+});
+
+router.get('/admin-data', authenticateToken, requireAdmin, (req, res) => {
+  // logika untuk mendapatkan data khusus admin
 });
 
 module.exports = router;

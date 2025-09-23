@@ -2,6 +2,7 @@ const Book = require('../models/Book');
 const Borrowing = require('../models/Borrowing');
 const { validateBorrowTime } = require('../utils/dateUtils');
 const { estimateBorrowCost } = require('../utils/fineCalculator');
+const mongoose = require('mongoose');
 
 // Validate borrowing request
 const validateBorrowRequest = async (req, res, next) => {
@@ -47,23 +48,20 @@ const checkBookAvailability = async (req, res, next) => {
   try {
     const { bookId } = req.validatedData;
 
+    // Validasi ObjectId format dulu
+    if (!mongoose.Types.ObjectId.isValid(bookId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID buku tidak valid'
+      });
+    }
+
     const book = await Book.findById(bookId);
+
     if (!book) {
       return res.status(404).json({
         success: false,
         message: 'Buku tidak ditemukan'
-      });
-    }
-
-    if (book.availableStock <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Buku sedang tidak tersedia',
-        details: {
-          title: book.title,
-          availableStock: book.availableStock,
-          totalStock: book.totalStock
-        }
       });
     }
 

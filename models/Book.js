@@ -396,8 +396,10 @@ bookSchema.methods.returnBook = function() {
     throw new Error('Error: Tidak ada buku yang sedang dipinjam untuk dikembalikan.');
   }
   
-  // Tambah available stock
-  this.availableStock += 1;
+  // Tambah available stock (dengan safety check)
+  if (this.availableStock < this.totalStock) {
+    this.availableStock += 1;
+  }
   
   return this.save();
 };

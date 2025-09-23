@@ -19,6 +19,15 @@ const router = express.Router();
 router.post('/borrow', 
   authenticateToken,
   logBorrowingActivity('BORROW'),
+  (req, res, next) => {
+    if (!req.body.bookId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Book ID wajib diisi'
+      });
+    }
+    next();
+  },
   validateBorrowRequest,
   checkBookAvailability,
   checkUserBorrowingLimits,
@@ -32,6 +41,20 @@ router.post('/borrow',
       // Calculate due date
       const borrowDate = new Date();
       const dueDate = calculateDueDate(borrowType, user.isMember, borrowDate);
+
+      // Cek apakah user sudah pinjam buku yang sama
+      const existingBorrowing = await Borrowing.findOne({
+        user: user._id,
+        book: book._id,
+        status: { $in: ['Active', 'Overdue'] }
+      });
+
+      if (existingBorrowing) {
+        return res.status(400).json({
+          success: false,
+          message: 'Anda sudah meminjam buku ini'
+        });
+      }
 
       // Create borrowing record
       const borrowing = new Borrowing({
