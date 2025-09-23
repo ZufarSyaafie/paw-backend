@@ -1,6 +1,6 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
-// NOTE: middleware/ berada sejajar dengan folder models/, jadi path ke User harus ../models/User
+// NOTE: middleware/ berada sejajar dengan folder models/, jadi path ke User harus .../models/User
 const User = require('../models/User');
 
 const authenticateToken = async (req, res, next) => {

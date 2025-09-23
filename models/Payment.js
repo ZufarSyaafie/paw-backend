@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); // ⬅️ lupa diimport kemarin
 
 const paymentSchema = new mongoose.Schema({
   user: {
@@ -9,7 +9,7 @@ const paymentSchema = new mongoose.Schema({
   borrowing: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Borrowing',
-    required: false, // Opsi: untuk pembayaran denda
+    required: false,
   },
   type: {
     type: String,
@@ -29,7 +29,7 @@ const paymentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  transactionId: String, // ID transaksi dari gateway pembayaran (opsional)
+  transactionId: String,
 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

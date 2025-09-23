@@ -1,51 +1,46 @@
+// models/RoomBooking.js
 const mongoose = require('mongoose');
 
 const roomBookingSchema = new mongoose.Schema({
   room: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Room',
-    required: true
+    required: true,
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
   },
   bookingDate: {
     type: Date,
-    required: true
+    required: true,
   },
   startTime: {
     type: String,
-    required: true
+    required: true,
   },
   endTime: {
     type: String,
-    required: true
+    required: true,
   },
   duration: {
-    type: Number,  // in hours
+    type: Number, // jam
     required: true,
-    min: 1
   },
   totalCost: {
     type: Number,
-    required: true
+    required: true,
   },
   status: {
     type: String,
-    enum: ['Pending', 'Confirmed', 'Completed', 'Cancelled'],
-    default: 'Pending'
+    enum: ['Active', 'Cancelled', 'Completed'],
+    default: 'Active',
   },
-  payment: {
-    status: {
-      type: String,
-      enum: ['Unpaid', 'Paid'],
-      default: 'Unpaid'
-    },
-    paidAt: Date
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
-  notes: String
-}, { timestamps: true });
+});
 
 module.exports = mongoose.model('RoomBooking', roomBookingSchema);

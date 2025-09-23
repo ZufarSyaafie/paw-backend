@@ -7,7 +7,7 @@ const validatePayment = (req, res, next) => {
     errors.push('Jumlah pembayaran tidak valid');
   }
 
-  const validTypes = ['commitment-fee', 'fine'];
+  const validTypes = ['commitmentFee', 'fine'];
   if (!type || !validTypes.includes(type)) {
     errors.push(`Tipe pembayaran harus salah satu dari: ${validTypes.join(', ')}`);
   }

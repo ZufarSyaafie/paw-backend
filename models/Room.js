@@ -1,7 +1,8 @@
+// models/Room.js
 const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
-  roomName: {
+  name: { // ubah dari roomName → name biar konsisten
     type: String,
     required: true,
     unique: true,
@@ -9,6 +10,10 @@ const roomSchema = new mongoose.Schema({
   capacity: {
     type: Number,
     required: true,
+  },
+  hourlyRate: { // biar bisa dihitung biaya booking
+    type: Number,
+    default: 0,
   },
   isAvailable: {
     type: Boolean,

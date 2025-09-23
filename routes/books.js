@@ -2,9 +2,9 @@
 const express = require('express');
 const router = express.Router();
 
-// dari routes/ ke models/ adalah ../models/Book
+// dari routes/ ke models/ adalah .../models/Book
 const Book = require('../models/Book');
-// middleware path relatif ke routes/ => ../middleware/auth
+// middleware path relatif ke routes/ => .../middleware/auth
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 // GET /api/books

@@ -1,4 +1,4 @@
-// routes/admin.js
+﻿// routes/admin.js
 const express = require('express');
 const router = express.Router();
 const Borrowing = require('../models/Borrowing');
@@ -54,3 +54,4 @@ router.get('/overdue', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+

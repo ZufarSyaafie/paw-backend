@@ -92,29 +92,65 @@ router.get('/profile', authenticateToken, async (req, res) => {
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { name, phoneNumber } = req.body;
+
+    // Cek nomor telepon kalo diubah
     if (phoneNumber && phoneNumber !== req.user.phoneNumber) {
       const existing = await User.findOne({ phoneNumber, _id: { $ne: req.user._id } });
-      if (existing) return res.status(400).json({ success: false, message: 'Nomor telepon sudah digunakan' });
+      if (existing) {
+        return res.status(400).json({ success: false, message: 'Nomor telepon sudah digunakan' });
+      }
     }
-    const updated = await User.findByIdAndUpdate(req.user._id, { name, phoneNumber }, { new: true, runValidators: true }).select('-password');
-    res.json({ success: true, message: 'Profile berhasil diupdate', data: { user: updated } });
+
+    // Update data
+    if (name) req.user.name = name;
+    if (phoneNumber) req.user.phoneNumber = phoneNumber;
+
+    await req.user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile berhasil diupdate',
+      data: { user: req.user }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 });
 
+
 // Upgrade membership
 router.post('/upgrade-membership', authenticateToken, async (req, res) => {
   try {
     const { email, password, membershipType } = req.body;
-    if (req.user.isMember) return res.status(400).json({ success: false, message: 'Anda sudah menjadi member' });
-    if (!email || !password) return res.status(400).json({ success: false, message: 'Email dan password wajib diisi untuk upgrade membership' });
+
+    if (req.user.isMember) {
+      return res.status(400).json({ success: false, message: 'Anda sudah menjadi member' });
+    }
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email dan password wajib diisi untuk upgrade membership' });
+    }
 
     const existing = await User.findOne({ email, _id: { $ne: req.user._id } });
-    if (existing) return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
+    }
 
-    const updated = await User.findByIdAndUpdate(req.user._id, { email, password, isMember: true, membershipDate: new Date(), membershipType: membershipType || 'Regular' }, { new: true, runValidators: true }).select('-password');
-    res.json({ success: true, message: 'Upgrade ke membership berhasil', data: { user: updated } });
+    // Update pake save() biar pre('save') ngehash password
+    req.user.email = email;
+    req.user.password = password;
+    req.user.isMember = true;
+    req.user.membershipDate = new Date();
+    req.user.membershipType = membershipType || 'Regular';
+    await req.user.save();
+
+    // Bikin token baru
+    const token = generateToken(req.user);
+
+    res.json({
+      success: true,
+      message: 'Upgrade ke membership berhasil',
+      data: { user: req.user, token }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
