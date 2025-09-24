@@ -3,6 +3,7 @@ const Loan = require("../models/Loan");
 const Announcement = require("../models/Announcement");
 const mongoose = require("mongoose");
 const snap = require("../services/midtrans");
+const { sendAnnouncementToAllUsers } = require("../services/emailService");
 
 exports.listBooks = async (req, res) => {
 	// support query params for search/sort
@@ -39,12 +40,21 @@ exports.createBook = async (req, res) => {
 		const book = await Book.create(payload);
 
 		// create an announcement automatically about new book
-		await Announcement.create({
+		const announcement = await Announcement.create({
 			bookTitle: book.title,
 			message: `Buku baru: "${book.title}" oleh ${
 				book.author || "Unknown author"
 			} sekarang tersedia.`,
 		});
+
+		// Send announcement email to all registered users
+		try {
+			const emailResult = await sendAnnouncementToAllUsers(announcement);
+			console.log(`Email announcement sent to ${emailResult.sent} users`);
+		} catch (emailError) {
+			console.error("Failed to send announcement emails:", emailError.message);
+			// Don't fail the book creation if email sending fails
+		}
 
 		res.status(201).json(book);
 	} catch (err) {
