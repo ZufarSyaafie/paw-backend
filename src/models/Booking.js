@@ -7,7 +7,7 @@ const bookingSchema = new mongoose.Schema({
 	startTime: { type: String, required: true }, // e.g. "13:00"
 	endTime: { type: String, required: true }, // e.g. "15:00"
 	durationHours: { type: Number, required: true },
-	phone: String,
+	phone: { type: String, required: true }, // Nomor telepon wajib diisi
 	status: {
 		type: String,
 		enum: ["pending", "confirmed", "cancelled"],

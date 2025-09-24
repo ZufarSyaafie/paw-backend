@@ -10,11 +10,21 @@ router.get("/:id", roomController.getRoom);
 router.post("/", authenticate(["admin"]), roomController.createRoom);
 router.put("/:id", authenticate(["admin"]), roomController.updateRoom);
 
-// booking (user)
+// booking management
+router.get(
+	"/bookings/list",
+	authenticate(["user", "admin"]),
+	roomController.getBookings
+);
 router.post(
 	"/:id/book",
 	authenticate(["user", "admin"]),
 	roomController.bookRoom
+);
+router.put(
+	"/bookings/:bookingId/cancel",
+	authenticate(["user", "admin"]),
+	roomController.cancelBooking
 );
 
 module.exports = router;

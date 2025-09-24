@@ -40,7 +40,7 @@ const sendAnnouncementToAllUsers = async (announcement) => {
 					html: `
 						<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 							<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-								<h1 style="color: white; margin: 0; font-size: 28px;">📚 PAW Library</h1>
+								<h1 style="color: white; margin: 0; font-size: 28px;">📚 Perpustakaan Naratama</h1>
 								<p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Sistem Perpustakaan</p>
 							</div>
 							
@@ -63,7 +63,7 @@ const sendAnnouncementToAllUsers = async (announcement) => {
 								<hr style="border: none; border-top: 1px solid #e9ecef; margin: 20px 0;">
 								
 								<p style="color: #6c757d; font-size: 12px; text-align: center; margin: 0;">
-									Email ini dikirim secara otomatis dari sistem PAW Library.<br>
+									Email ini dikirim secara otomatis dari sistem Perpustakaan Naratama.<br>
 									Jika Anda tidak ingin menerima email ini lagi, silakan hubungi administrator.
 								</p>
 							</div>
@@ -126,7 +126,7 @@ const sendCustomAnnouncementToAllUsers = async (title, message) => {
 					html: `
 						<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 							<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-								<h1 style="color: white; margin: 0; font-size: 28px;">📢 PAW Library</h1>
+								<h1 style="color: white; margin: 0; font-size: 28px;">📢 Perpustakaan Naratama</h1>
 								<p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Sistem Perpustakaan</p>
 							</div>
 							
@@ -149,7 +149,7 @@ const sendCustomAnnouncementToAllUsers = async (title, message) => {
 								<hr style="border: none; border-top: 1px solid #e9ecef; margin: 20px 0;">
 								
 								<p style="color: #6c757d; font-size: 12px; text-align: center; margin: 0;">
-									Email ini dikirim secara otomatis dari sistem PAW Library.<br>
+									Email ini dikirim secara otomatis dari sistem Perpustakaan Naratama.<br>
 									Jika Anda tidak ingin menerima email ini lagi, silakan hubungi administrator.
 								</p>
 							</div>

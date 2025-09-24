@@ -35,7 +35,7 @@ const sendOTPEmail = async (email, otp, type = "verification") => {
 			subject: subject,
 			html: `
 				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-					<h2 style="color: #333;">PAW Library System</h2>
+					<h2 style="color: #333;">Perpustakaan Naratama</h2>
 					<p style="font-size: 16px;">${message}</p>
 					<div style="background-color: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
 						<h1 style="color: #007bff; margin: 0; font-size: 32px; letter-spacing: 5px;">${otp}</h1>

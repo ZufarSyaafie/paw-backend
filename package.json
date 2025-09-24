@@ -1,5 +1,5 @@
 {
-  "name": "paw-backend",
+  "name": "perpustakaan-naratama-backend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Backend API untuk Sistem Perpustakaan Naratama",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
