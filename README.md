@@ -67,7 +67,7 @@ Backend API modern untuk Sistem Perpustakaan Naratama dengan fitur lengkap melip
 
    ```bash
    git clone https://github.com/ZufarSyaafie/paw-backend.git
-   cd perpustakaan-naratama-backend
+   cd paw-backend
    ```
 
 2. **Install dependencies**
@@ -281,9 +281,8 @@ This project is licensed under the ISC License.
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/perpustakaan-naratama-backend.git
-cd perpustakaan-naratama-backend
-
+git clone https://github.com/ZufarSyaafie/paw-backend.git
+cd paw-backend
 # Install dependencies
 npm install
 
