@@ -19,4 +19,11 @@ router.post(
 	bookController.borrowBook
 );
 
+// return book (user/admin)
+router.put(
+	"/loans/:id/return",
+	authenticate(["user", "admin"]),
+	bookController.returnBook
+);
+
 module.exports = router;
