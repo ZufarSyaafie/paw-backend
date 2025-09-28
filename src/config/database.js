@@ -4,7 +4,7 @@ dotenv.config();
 
 const connectDB = async () => {
 	try {
-		await mongoose.connect(process.env.MONGO_URI, {
+		await mongoose.connect(process.env.MONGODB_URI, { // formerly, it was MONGO_URI
 			// options not required for mongoose 7+
 		});
 		console.log(`MongoDB connected: ${mongoose.connection.host}`);
