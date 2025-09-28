@@ -13,6 +13,8 @@ const bookRoutes = require("./src/routes/bookRoutes");
 const roomRoutes = require("./src/routes/roomRoutes");
 const announcementRoutes = require("./src/routes/announcementRoutes");
 const paymentRoutes = require("./src/routes/paymentRoutes");
+const userRoutes = require("./src/routes/userRoutes");
+const loanRoutes = require("./src/routes/loanRoutes");
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/books", bookRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/loans", loanRoutes);
 
 // health
 app.get("/", (req, res) => res.send("Perpustakaan API running"));
