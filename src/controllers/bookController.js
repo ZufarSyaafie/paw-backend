@@ -7,24 +7,34 @@ const { sendAnnouncementToAllUsers } = require("../services/emailService");
 
 exports.listBooks = async (req, res) => {
 	// support query params for search/sort
-	const { q, sortBy, order = "asc", page = 1, limit = 20 } = req.query;
-	const filter = {};
-	if (q) {
-		filter.$or = [
-			{ title: new RegExp(q, "i") },
-			{ author: new RegExp(q, "i") },
-			{ category: new RegExp(q, "i") },
-		];
-	}
+    try {
+        const { sortBy, order = "asc", page = 1, limit = 20, ...queries } = req.query;
 
-	const sort = {};
-	if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
+        const filter = {};
+        for (const key in queries) {
+            if (["createdAt", "__v", "_id"].includes(key)) continue; // skip field yg ga dipake filter
+            if (["year", "stock"].includes(key)) {
+                // numeric fields
+                filter[key] = parseInt(queries[key]);
+            } else {
+                // text fields pake regex biar fleksibel
+                filter[key] = new RegExp(queries[key], "i");
+            }
+        }
 
-	const books = await Book.find(filter)
-		.sort(sort)
-		.skip((page - 1) * limit)
-		.limit(parseInt(limit));
-	res.json({ data: books });
+        const sort = {};
+        if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
+
+        const books = await Book.find(filter)
+            .sort(sort)
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit));
+
+        res.json({ data: books });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "server error" });
+    }
 };
 
 exports.getBook = async (req, res) => {
