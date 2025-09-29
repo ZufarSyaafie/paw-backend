@@ -419,3 +419,8 @@ sudo systemctl start mongod
 - **Integrations**: MongoDB, Midtrans, Gmail
 
 **🏆 Perpustakaan Naratama Backend API** - Modern library system dengan security tinggi, email automation, dan intelligent room booking system.
+
+## 📁 File Laporan Backend
+Berikut merupakan file laporan dari proyek backend Perpustakaan Naratama:
+
+[📌Lihat file laporan disini!](https://drive.google.com/drive/folders/1chgktU5-nEmh4njCAPTzf73LAFJq1_xZ?usp=sharing)
