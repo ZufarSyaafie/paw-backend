@@ -181,7 +181,9 @@ src/
 │   ├── bookController.js       # Book management
 │   ├── roomController.js       # Room booking system
 │   ├── announcementController.js # Announcement system
-│   └── paymentController.js    # Payment handling
+│   ├── paymentController.js    # Announcement system
+│   ├── usersController.js      # User system
+│   └── loansController.js      # Loan handling
 ├── middleware/
 │   └── authMiddleware.js       # Authentication middleware
 ├── models/
@@ -196,7 +198,9 @@ src/
 │   ├── bookRoutes.js           # Book endpoints
 │   ├── roomRoutes.js           # Room booking endpoints
 │   ├── announcementRoutes.js   # Announcement endpoints
-│   └── paymentRoutes.js        # Payment endpoints
+│   ├── paymentRoutes.js        # Payment endpoints
+|   ├── userRoutes.js           # User endpoints
+|   └── loanRoutes.js           # Loan endpoints
 ├── services/
 │   ├── emailService.js         # Email announcement service
 │   └── midtrans.js            # Midtrans integration
