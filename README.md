@@ -264,9 +264,14 @@ src/
 
 This project is licensed under the ISC License.
 
-## 👥 Authors
+## 👥 Authors - Naratama's Team
 
-- **Perpustakaan Naratama Team**
+- 23/517479/TK/56923 | Muhammad Zufar Syaafi'
+- 23/514860/TK/56532 | Olivia Nefri
+- 23/516603/TK/56796 | Abdul Halim Edi Rahmansyah
+- 23/517440/TK/56918 | Syifa Alifiya
+- 23/515523/TK/56680 | Kistosi Al Ghifari
+
 
 ## 🚀 Quick Start Guide
 
