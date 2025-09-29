@@ -169,6 +169,25 @@ POST   /payment/notification       # Midtrans webhook callback
 GET    /payment/status/:orderId    # Check payment status
 ```
 
+### 👥 User Endpoints
+
+```
+GET    /users                   # List all users (admin only)
+GET    /users/:id               # Get user profile (admin or owner)
+POST   /users                   # Create user (admin) — quick admin creation/seed helper
+PUT    /users/:id               # Update user (admin or owner)
+DELETE /users/:id               # Delete user (admin only)
+```
+
+### 📋 Loan Endpoints
+
+```
+GET    /loans/my                   # Get current user's loans (requires JWT)
+GET    /loans/:id                  # Get loan by id (owner or admin)
+GET    /loans                       # Get all loans (admin only)
+POST   /loans/:id/return            # Return a loan (owner or admin)
+```
+
 ## 📁 Project Structure
 
 ```
