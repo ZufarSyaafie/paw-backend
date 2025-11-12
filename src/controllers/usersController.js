@@ -52,6 +52,58 @@ exports.getMe = async (req, res) => {
   }
 };
 
+exports.updateMe = async (req, res) => {
+  try {
+    const id = req.user.id;
+    const { username, bio, email } = req.body; // Ambil data baru
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const updateData = {};
+
+    if (username !== undefined) {
+      updateData.name = username;
+    }
+
+    if (bio !== undefined) {
+      updateData.bio = bio;
+    }
+
+    if (email !== undefined && email !== user.email) {
+      const existing = await User.findOne({ email: email });
+      if (existing && existing._id.toString() !== id) {
+        return res.status(400).json({ message: "Email already taken" });
+      }
+      
+      updateData.email = email;
+      updateData.isVerified = false; 
+    }
+
+    if (profilePicture !== undefined) {
+      updateData.profilePicture = profilePicture;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+        return res.status(200).json(user); // Balikin data lama aja
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true } 
+    ).select("-password -otp -otpExpiration");
+
+    res.json(updatedUser);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password -otp -otpExpiration");

@@ -12,6 +12,9 @@ router.post("/", verifyToken, requireAdmin, usersController.createUser);
 // get current user profile
 router.get("/me", verifyToken, usersController.getMe);
 
+// update current user profile
+router.put("/me", verifyToken, usersController.updateMe);
+
 // admin: get user by id
 router.get("/:id", verifyToken, requireAdmin, usersController.getUserById);
 

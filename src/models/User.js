@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema({
 	otp: { type: String },
 	otpExpiration: { type: Date },
 	createdAt: { type: Date, default: Date.now },
+	profilePicture: {
+		type: String,
+		default: "https://api.dicebear.com/7.x/avataaars/svg?seed=user_default",
+	},
+	bio: { type: String},
 });
 
 module.exports = mongoose.model("User", userSchema);

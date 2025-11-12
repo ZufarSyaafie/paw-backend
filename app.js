@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const passport = require("passport");
+const cors = require("cors");
 require("dotenv").config();
 
 // init passport strategy
@@ -17,6 +18,11 @@ const userRoutes = require("./src/routes/userRoutes");
 const loanRoutes = require("./src/routes/loanRoutes");
 
 const app = express();
+
+app.use(cors({ 
+  origin: 'http://localhost:3000', 
+  credentials: true 
+}));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

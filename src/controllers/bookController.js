@@ -8,9 +8,18 @@ const { sendAnnouncementToAllUsers } = require("../services/emailService");
 exports.listBooks = async (req, res) => {
 	// support query params for search/sort
     try {
-        const { sortBy, order = "asc", page = 1, limit = 20, ...queries } = req.query;
+        const { sortBy, order = "asc", page = 1, limit = 20, search, ...queries } = req.query;
 
         const filter = {};
+		if (search) {
+			const regex = new RegExp(search, "i");
+			filter.$or = [
+				{ title: regex },
+				{ author: regex },
+				{ isbn: regex },
+				{ description: regex },
+			];
+		}
         for (const key in queries) {
             if (["createdAt", "__v", "_id"].includes(key)) continue; // skip field yg ga dipake filter
             if (["year", "stock"].includes(key)) {
@@ -30,7 +39,7 @@ exports.listBooks = async (req, res) => {
             .skip((page - 1) * limit)
             .limit(parseInt(limit));
 
-        res.json({ data: books });
+        res.json({ data: books, total: books.length });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "server error" });
@@ -38,6 +47,9 @@ exports.listBooks = async (req, res) => {
 };
 
 exports.getBook = async (req, res) => {
+	if (!req.params.id || req.params.id === 'undefined') {
+		return res.status(400).json({ message: "Book ID is required" });
+	}
 	const book = await Book.findById(req.params.id);
 	if (!book) return res.status(404).json({ message: "Book not found" });
 	res.json(book);
@@ -180,7 +192,19 @@ exports.returnBook = async (req, res) => {
 	}
 };
 
+exports.getCategories = async (req, res) => {
+	try {
+		const categories = await Book.distinct("category");
+		const filteredCategories = categories.filter(cat => cat);
+		res.json(filteredCategories);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: "Server error" });
+	}
+};
+
 const midtransClient = require("midtrans-client");
+const { search } = require("../routes/authRoutes");
 const core = new midtransClient.CoreApi({
 	isProduction: false,
 	serverKey: process.env.MIDTRANS_SERVER_KEY,
