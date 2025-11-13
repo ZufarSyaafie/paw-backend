@@ -9,6 +9,8 @@ router.get("/my", verifyToken, loansController.myLoans);
 // admin: get all loans
 router.get("/", verifyToken, requireAdmin, loansController.listAllLoans);
 
+router.get("/status", verifyToken, loansController.checkLoanByBookId);
+
 // return a loan (user or admin)
 router.post("/:id/return", verifyToken, loansController.returnLoan);
 

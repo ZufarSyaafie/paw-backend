@@ -1,9 +1,10 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 10;
+const asyncHandler = require("express-async-handler");
 
 // list users (no sensitive fields)
-exports.listUsers = async (req, res) => {
+exports.listUsers = asyncHandler(async (req, res) => {
   try {
     const users = await User.find().select("-password -otp -otpExpiration");
     res.json(users);
@@ -11,9 +12,9 @@ exports.listUsers = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.createUser = async (req, res) => {
+exports.createUser = asyncHandler(async (req, res) => {
   try {
     const { name, email, role = "user", password } = req.body;
     if (!email) return res.status(400).json({ message: "Email required" });
@@ -38,9 +39,9 @@ exports.createUser = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.getMe = async (req, res) => {
+exports.getMe = asyncHandler(async (req, res) => {
   try {
     const id = req.user.id;
     const user = await User.findById(id).select("-password -otp -otpExpiration");
@@ -50,12 +51,12 @@ exports.getMe = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.updateMe = async (req, res) => {
+exports.updateMe = asyncHandler(async (req, res) => {
   try {
     const id = req.user.id;
-    const { username, bio, email } = req.body; // Ambil data baru
+    const { username, bio, email, profilePicture, phone } = req.body; // Ambil data baru
 
     const user = await User.findById(id);
     if (!user) {
@@ -86,6 +87,10 @@ exports.updateMe = async (req, res) => {
       updateData.profilePicture = profilePicture;
     }
 
+    if (phone !== undefined) {
+      updateData.phone = phone;
+    }
+
     if (Object.keys(updateData).length === 0) {
         return res.status(200).json(user); // Balikin data lama aja
     }
@@ -102,9 +107,9 @@ exports.updateMe = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.getUserById = async (req, res) => {
+exports.getUserById = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password -otp -otpExpiration");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -113,9 +118,9 @@ exports.getUserById = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.deleteUser = async (req, res) => {
+exports.deleteUser = asyncHandler(async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: "user deleted successfully" });
@@ -123,4 +128,4 @@ exports.deleteUser = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});

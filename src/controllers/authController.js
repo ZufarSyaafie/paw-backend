@@ -9,8 +9,9 @@ const {
 } = require("../utils/otpService");
 
 const SALT_ROUNDS = 10;
+const asyncHandler = require("express-async-handler");
 
-exports.register = async (req, res) => {
+exports.register = asyncHandler(async (req, res) => {
 	try {
 		const { name, email, password } = req.body;
 		if (!email || !password)
@@ -48,9 +49,9 @@ exports.register = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
-exports.login = async (req, res) => {
+exports.login = asyncHandler(async (req, res) => {
 	try {
 		const { email, password } = req.body;
 		if (!email || !password)
@@ -86,10 +87,10 @@ exports.login = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // Verify OTP for registration and auto-login
-exports.verifyRegistrationOTP = async (req, res) => {
+exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 	try {
 		const { email, otp } = req.body;
 		if (!email || !otp)
@@ -133,10 +134,10 @@ exports.verifyRegistrationOTP = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // Verify OTP for login
-exports.verifyLoginOTP = async (req, res) => {
+exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 	try {
 		const { email, otp } = req.body;
 		if (!email || !otp)
@@ -176,10 +177,10 @@ exports.verifyLoginOTP = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // Resend OTP for registration
-exports.resendRegistrationOTP = async (req, res) => {
+exports.resendRegistrationOTP = asyncHandler(async (req, res) => {
 	try {
 		const { email } = req.body;
 		if (!email) return res.status(400).json({ message: "Email required" });
@@ -210,10 +211,10 @@ exports.resendRegistrationOTP = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // Resend OTP for login
-exports.resendLoginOTP = async (req, res) => {
+exports.resendLoginOTP = asyncHandler(async (req, res) => {
 	try {
 		const { email } = req.body;
 		if (!email) return res.status(400).json({ message: "Email required" });
@@ -241,7 +242,7 @@ exports.resendLoginOTP = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // OAuth success handler - used by /auth/google/callback route to redirect
 exports.googleCallbackSuccess = (req, res) => {

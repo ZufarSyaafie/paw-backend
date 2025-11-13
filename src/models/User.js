@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
 		default: "https://api.dicebear.com/7.x/avataaars/svg?seed=user_default",
 	},
 	bio: { type: String},
+	phone: { type: String },
 });
 
 module.exports = mongoose.model("User", userSchema);

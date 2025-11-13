@@ -43,4 +43,17 @@ app.use("/api/loans", loanRoutes);
 // health
 app.get("/", (req, res) => res.send("Perpustakaan API running"));
 
+app.use((err, req, res, next) => {
+	console.error(err.stack); // log errornya di server
+	
+	const statusCode = err.status || 500;
+	const message = err.message || "Terjadi kesalahan pada server";
+
+	res.status(statusCode).json({
+		message: message,
+		// Kalo lagi development, kirim stack trace-nya
+		stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+	});
+});
+
 module.exports = app;

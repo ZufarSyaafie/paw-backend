@@ -1,9 +1,10 @@
 const Loan = require("../models/Loan");
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
+const asyncHandler = require("express-async-handler");
 
 // get loans for current user
-exports.myLoans = async (req, res) => {
+exports.myLoans = asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
     const loans = await Loan.find({ user: userId }).populate("book");
@@ -12,10 +13,10 @@ exports.myLoans = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 // admin: list all loans
-exports.listAllLoans = async (req, res) => {
+exports.listAllLoans = asyncHandler(async (req, res) => {
   try {
     const loans = await Loan.find().populate("user").populate("book");
     res.json(loans);
@@ -23,15 +24,15 @@ exports.listAllLoans = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-exports.getLoanById = async (req, res) => {
+exports.getLoanById = asyncHandler(async (req, res) => {
   try {
     const loan = await Loan.findById(req.params.id).populate("book user");
     if (!loan) return res.status(404).json({ message: "Loan not found" });
 
     // if not admin, ensure owner
-    if (req.user.role !== "admin" && loan.user.toString() !== req.user.id) {
+    if (req.user.role !== "admin" && loan.user._id.toString() !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -40,17 +41,17 @@ exports.getLoanById = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 // return loan (simple refund mock & stock adjust)
-exports.returnLoan = async (req, res) => {
+exports.returnLoan = asyncHandler(async (req, res) => {
   try {
     const loanId = req.params.id;
     const loan = await Loan.findById(loanId).populate("book");
     if (!loan) return res.status(404).json({ message: "Loan not found" });
 
     // permission: owner or admin
-    if (req.user.role !== "admin" && loan.user.toString() !== req.user.id) {
+    if (req.user.role !== "admin" && loan.user._id.toString() !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -84,4 +85,44 @@ exports.returnLoan = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
+
+exports.checkLoanByBookId = asyncHandler(async (req, res) => {
+    try {
+        const { bookId } = req.query;
+        const userId = req.user.id;
+
+        if (!bookId) return res.status(400).json({ message: "Book ID is required." });
+
+        const loan = await Loan.findOne({
+            book: bookId,
+            user: userId,
+            status: 'borrowed' 
+        })
+        .populate('book')
+        .sort({ borrowedAt: -1 }); 
+
+        if (!loan) {
+            return res.status(404).json({ message: "No active loan found." }); 
+        }
+
+        let loanStatus = "borrowed"; 
+        const isOverdue = new Date(loan.dueDate) < new Date();
+        
+        if (isOverdue) {
+            loanStatus = "overdue";
+        } else if (loan.paymentStatus === 'unpaid') {
+            loanStatus = "pending"; 
+        }
+
+        res.json({
+            status: loanStatus,
+            paymentStatus: loan.paymentStatus,
+            dueDate: loan.dueDate,
+        });
+
+    } catch (err) {
+        console.error("Error checking loan by book ID:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});

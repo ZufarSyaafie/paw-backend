@@ -8,6 +8,7 @@ router.get("/", bookController.listBooks);
 router.get("/:id", bookController.getBook);
 
 // buat relevant filter
+router.get("/categories/top", bookController.getTopCategories);
 router.get("/categories", bookController.getCategories);
 
 // admin only

@@ -2,6 +2,7 @@ const Loan = require("../models/Loan");
 const Book = require("../models/Book");
 const Booking = require("../models/Booking");
 const midtransClient = require("midtrans-client");
+const asyncHandler = require("express-async-handler");
 
 const core = new midtransClient.CoreApi({
 	isProduction: false,
@@ -9,7 +10,7 @@ const core = new midtransClient.CoreApi({
 	clientKey: process.env.MIDTRANS_CLIENT_KEY,
 });
 
-exports.notification = async (req, res) => {
+exports.notification = asyncHandler(async (req, res) => {
 	try {
 		console.log("Raw notification:", req.body);
 
@@ -103,9 +104,9 @@ exports.notification = async (req, res) => {
 			.status(200)
 			.json({ message: "Notification received but error", error: err.message });
 	}
-};
+});
 
-exports.listMyPayments = async (req, res) => {
+exports.listMyPayments = asyncHandler(async (req, res) => {
     try {
         const userId = req.user.id;
 
@@ -156,4 +157,4 @@ exports.listMyPayments = async (req, res) => {
         console.error("Error fetching my payments:", err);
         res.status(500).json({ message: "Server error" });
     }
-};
+});

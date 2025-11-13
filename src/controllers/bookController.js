@@ -2,60 +2,73 @@ const Book = require("../models/Book");
 const Loan = require("../models/Loan");
 const Announcement = require("../models/Announcement");
 const mongoose = require("mongoose");
-const snap = require("../services/midtrans");
+const { snap, core } = require("../services/midtrans");
 const { sendAnnouncementToAllUsers } = require("../services/emailService");
+const asyncHandler = require("express-async-handler");
 
-exports.listBooks = async (req, res) => {
-	// support query params for search/sort
-    try {
-        const { sortBy, order = "asc", page = 1, limit = 20, search, ...queries } = req.query;
+const getTopCategories = asyncHandler(async (req, res) => {
+	const limit = parseInt(req.query.limit, 10) || 10;
+	const agg = await Book.aggregate([
+		{ $match: { category: { $exists: true, $ne: null } } },
+		{ $group: { _id: "$category", count: { $sum: 1 } } },
+		{ $sort: { count: -1 } },
+		{ $limit: limit },
+		{ $project: { category: "$_id", count: 1, _id: 0 } },
+	]);
+	res.json(agg.map(x => x.category));
+});
 
-        const filter = {};
-		if (search) {
-			const regex = new RegExp(search, "i");
-			filter.$or = [
-				{ title: regex },
-				{ author: regex },
-				{ isbn: regex },
-				{ description: regex },
-			];
-		}
-        for (const key in queries) {
-            if (["createdAt", "__v", "_id"].includes(key)) continue; // skip field yg ga dipake filter
-            if (["year", "stock"].includes(key)) {
-                // numeric fields
-                filter[key] = parseInt(queries[key]);
+exports.listBooks = asyncHandler(async (req, res) => {
+    const { sortBy, order = "asc", page = 1, limit = 20, search, ...queries } = req.query;
+    
+    const filter = {};
+    if (search) {
+        const regex = new RegExp(search, "i");
+        filter.$or = [
+            { title: regex },
+            { author: regex },
+            { isbn: regex },
+            { description: regex },
+        ];
+    }
+    for (const key in queries) {
+        if (["createdAt", "__v", "_id"].includes(key)) continue;
+        if (["year", "stock"].includes(key)) {
+            filter[key] = parseInt(queries[key]);
+        } else {
+            if (key === 'status') {
+              filter[key] = queries[key];
             } else {
-                // text fields pake regex biar fleksibel
-                filter[key] = new RegExp(queries[key], "i");
+              filter[key] = new RegExp(queries[key], "i");
             }
         }
+    }
 
-        const sort = {};
-        if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
+    const sort = {};
+    if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
 
-        const books = await Book.find(filter)
+    const [books, totalCount] = await Promise.all([
+        Book.find(filter)
             .sort(sort)
             .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+            .limit(parseInt(limit))
+            .lean(),
+        Book.countDocuments(filter) 
+    ]);
 
-        res.json({ data: books, total: books.length });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "server error" });
-    }
-};
+    res.json({ data: books, total: totalCount });
+});
 
-exports.getBook = async (req, res) => {
+exports.getBook = asyncHandler(async (req, res) => {
 	if (!req.params.id || req.params.id === 'undefined') {
 		return res.status(400).json({ message: "Book ID is required" });
 	}
 	const book = await Book.findById(req.params.id);
 	if (!book) return res.status(404).json({ message: "Book not found" });
 	res.json(book);
-};
+});
 
-exports.createBook = async (req, res) => {
+exports.createBook = asyncHandler(async (req, res) => {
 	try {
 		// admin only route (enforced by middleware)
 		const payload = req.body;
@@ -64,9 +77,7 @@ exports.createBook = async (req, res) => {
 		// create an announcement automatically about new book
 		const announcement = await Announcement.create({
 			bookTitle: book.title,
-			message: `Buku baru: "${book.title}" oleh ${
-				book.author || "Unknown author"
-			} sekarang tersedia.`,
+			message: `Buku baru: "${book.title}" oleh ${book.author || "Unknown author"} sekarang tersedia.`,
 		});
 
 		// Send announcement email to all registered users
@@ -75,7 +86,6 @@ exports.createBook = async (req, res) => {
 			console.log(`Email announcement sent to ${emailResult.sent} users`);
 		} catch (emailError) {
 			console.error("Failed to send announcement emails:", emailError.message);
-			// Don't fail the book creation if email sending fails
 		}
 
 		res.status(201).json(book);
@@ -83,23 +93,23 @@ exports.createBook = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
-exports.updateBook = async (req, res) => {
+exports.updateBook = asyncHandler(async (req, res) => {
 	const book = await Book.findByIdAndUpdate(req.params.id, req.body, {
 		new: true,
 	});
 	if (!book) return res.status(404).json({ message: "Book not found" });
 	res.json(book);
-};
+});
 
-exports.deleteBook = async (req, res) => {
+exports.deleteBook = asyncHandler(async (req, res) => {
 	await Book.findByIdAndDelete(req.params.id);
 	res.json({ message: "Deleted" });
-};
+});
 
 // Borrow with Midtrans
-exports.borrowBook = async (req, res) => {
+exports.borrowBook = asyncHandler(async (req, res) => {
 	try {
 		const userId = req.user.id;
 		const bookId = req.params.id;
@@ -108,8 +118,14 @@ exports.borrowBook = async (req, res) => {
 		dueDate.setDate(dueDate.getDate() + 7);
 
 		const book = await Book.findById(bookId);
-		if (!book || book.stock <= 0) {
-			return res.status(400).json({ message: "Book not available" });
+		if (!book) {
+			return res.status(404).json({ message: "Book not found" });
+		}
+		if (book.status === 'unavailable') {
+			return res.status(400).json({ message: "Book is currently unavailable" });
+		}
+		if (book.stock <= 0) {
+			return res.status(400).json({ message: "Book out of stock" });
 		}
 
 		// buat loan entry unpaid
@@ -146,10 +162,10 @@ exports.borrowBook = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
 // Return book + refund
-exports.returnBook = async (req, res) => {
+exports.returnBook = asyncHandler(async (req, res) => {
 	try {
 		const loanId = req.params.id;
 		const loan = await Loan.findById(loanId).populate("book");
@@ -190,9 +206,9 @@ exports.returnBook = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
-exports.getCategories = async (req, res) => {
+exports.getCategories = asyncHandler(async (req, res) => {
 	try {
 		const categories = await Book.distinct("category");
 		const filteredCategories = categories.filter(cat => cat);
@@ -201,12 +217,6 @@ exports.getCategories = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
-
-const midtransClient = require("midtrans-client");
-const { search } = require("../routes/authRoutes");
-const core = new midtransClient.CoreApi({
-	isProduction: false,
-	serverKey: process.env.MIDTRANS_SERVER_KEY,
-	clientKey: process.env.MIDTRANS_CLIENT_KEY,
 });
+
+exports.getTopCategories = getTopCategories;

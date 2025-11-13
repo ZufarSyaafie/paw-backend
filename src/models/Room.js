@@ -2,11 +2,16 @@ const mongoose = require("mongoose");
 
 const roomSchema = new mongoose.Schema({
 	name: { type: String, required: true },
+	description: { type: String },
 	capacity: Number,
 	facilities: [String],
 	price: Number,
 	photos: [String],
-	// bookings will be stored in Booking model; optionally can keep availability summary
+	status: {
+		type: String,
+		enum: ["available", "maintenance"],
+		default: "available",
+	},
 	createdAt: { type: Date, default: Date.now },
 });
 

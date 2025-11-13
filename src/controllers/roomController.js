@@ -1,5 +1,5 @@
 const Room = require("../models/Room");
-const Booking = require("../models/Booking"); // Ini udah lu import
+const Booking = require("../models/Booking");
 const snap = require("../services/midtrans");
 const { isWeekend, parseISO, differenceInHours } = require("date-fns");
 const {
@@ -9,62 +9,84 @@ const {
 	validatePhoneNumber,
 	normalizePhoneNumber,
 } = require("../utils/dateUtils");
+const timeToMinutes = (time) => {
+	const [h, m] = time.split(':').map(Number);
+	return h * 60 + m;
+};
+const asyncHandler = require("express-async-handler");
 
-exports.listRooms = async (req, res) => {
+exports.listRooms = asyncHandler(async (req, res) => {
 	try {
 		const rooms = await Room.find().lean();
+		
+		const now = new Date();
+		const todayStart = new Date();
+		todayStart.setHours(0, 0, 0, 0); 
 
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-
-		const upcomingBookings = await Booking.find({
+		const confirmedBookingsToday = await Booking.find({
 			status: "confirmed",
-			date: { $gte: today } 
-		}).select("room");
+			date: todayStart,
+		});
+		const activeRoomIds = new Set();
+		const bufferMinutes = 30; 
 
-		const bookedRoomIds = new Set(
-			upcomingBookings.map(b => b.room.toString())
-		);
+		confirmedBookingsToday.forEach(booking => {
+            
+            const [startH, startM] = booking.startTime.split(':').map(Number);
+            const bookingStartDateTime = new Date(booking.date);
+            bookingStartDateTime.setHours(startH, startM, 0, 0);
+
+            const [endH, endM] = booking.endTime.split(':').map(Number);
+            const bookingEndDateTime = new Date(booking.date);
+            bookingEndDateTime.setHours(endH, endM, 0, 0);
+            
+            const bookingEndWithBuffer = bookingEndDateTime.getTime() + (bufferMinutes * 60 * 1000); // End Time + 30 menit
+
+            if (now.getTime() >= bookingStartDateTime.getTime() && now.getTime() < bookingEndWithBuffer) {
+                 activeRoomIds.add(booking.room.toString()); 
+			}
+		});
 
 		const roomsWithStatus = rooms.map(room => {
-			const isBooked = bookedRoomIds.has(room._id.toString());
+			if (room.status === "maintenance") {
+				return {
+					...room, status: "maintenance"
+				};
+			}
+
+			const isCurrentlyBooked = activeRoomIds.has(room._id.toString());
 			
 			return {
 				...room,
-				status: isBooked ? "booked" : "available" // Tambahin field status!
+				status: isCurrentlyBooked ? "booked" : "available" 
 			};
 		});
-
 		res.json(roomsWithStatus);
 
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ message: "Server error while listing rooms" });
 	}
-};
-
-exports.getRoom = async (req, res) => {
+});
+exports.getRoom = asyncHandler(async (req, res) => {
 	if (!req.params.id || req.params.id === 'undefined') {
 		return res.status(400).json({ message: "Room ID is required" });
 	}
 	const room = await Room.findById(req.params.id);
-	if (!room) return res.status(404).json({ message: "Room not found" });
+	if (!room) return res.status(404).json({ message: "Book not found" });
 	res.json(room);
-};
-
-exports.createRoom = async (req, res) => {
+});
+exports.createRoom = asyncHandler(async (req, res) => {
 	const room = await Room.create(req.body);
 	res.status(201).json(room);
-};
-
-exports.updateRoom = async (req, res) => {
+});
+exports.updateRoom = asyncHandler(async (req, res) => {
 	const room = await Room.findByIdAndUpdate(req.params.id, req.body, {
 		new: true,
 	});
 	res.json(room);
-};
-
-exports.getBookings = async (req, res) => {
+});
+exports.getBookings = asyncHandler(async (req, res) => {
 	try {
 		const { roomId, date, userId } = req.query;
 		let filter = {};
@@ -74,9 +96,6 @@ exports.getBookings = async (req, res) => {
 			filter.date = d;
 		}
 		if (userId) filter.user = userId;
-		
-		filter.status = { $ne: "cancelled" }; // Jangan tampilkan yg batal
-
 		const bookings = await Booking.find(filter)
 			.populate("user", "name email")
 			.populate("room", "name capacity")
@@ -87,9 +106,9 @@ exports.getBookings = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
-exports.cancelBooking = async (req, res) => {
+exports.cancelBooking = asyncHandler(async (req, res) => {
 	try {
 		const bookingId = req.params.bookingId;
 		const booking = await Booking.findById(bookingId);
@@ -112,7 +131,6 @@ exports.cancelBooking = async (req, res) => {
 
 		const now = new Date();
 		const hoursUntilBooking = (bookingDateTime - now) / (1000 * 60 * 60);
-
 		if (hoursUntilBooking < 2 && req.user.role !== "admin") {
 			return res.status(400).json({
 				message:
@@ -131,9 +149,8 @@ exports.cancelBooking = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
-
-exports.bookRoom = async (req, res) => {
+});
+exports.bookRoom = asyncHandler(async (req, res) => {
 	try {
 		const { date, startTime, endTime, phone } = req.body;
 		if (!date || !startTime || !endTime || !phone) {
@@ -172,8 +189,18 @@ exports.bookRoom = async (req, res) => {
 				message: "Format waktu tidak valid. Gunakan format HH:MM (24 jam)",
 			});
 		}
+        
+    const [startMin] = startTime.split(":").map(Number).slice(-1);
+    const [endMin] = endTime.split(":").map(Number).slice(-1);
+
+    if (startMin % 30 !== 0 || endMin % 30 !== 0) {
+      return res.status(400).json({
+        message: "Waktu peminjaman harus dalam kelipatan 30 menit.",
+      });
+    }
+
 		const duration = calculateDurationHours(startTime, endTime);
-		if (duration < 1) {
+		if (duration < 1) { 
 			return res.status(400).json({
 				message: "Durasi peminjaman minimal 1 jam",
 			});
@@ -184,28 +211,53 @@ exports.bookRoom = async (req, res) => {
 			});
 		}
 
-		// CEK KONFLIK
+		// CEK KONFLIK (add buffer 30mins untuk prepare room for next sesi)
 		const roomId = req.params.id;
-		const existingBooking = await Booking.findOne({
-			room: roomId,
-			date: d,
-			status: { $ne: "cancelled" }, 
-			$or: [
-				{ startTime: { $lte: startTime }, endTime: { $gt: startTime } },
-				{ startTime: { $lt: endTime }, endTime: { $gte: endTime } },
-				{ startTime: { $gte: startTime }, endTime: { $lte: endTime } },
-			],
-		});
-		if (existingBooking) {
+		const existingBookings = await Booking.find({
+            room: roomId,
+            date: d,
+            status: { $in: ["pending_payment", "confirmed"] },
+        });
+		const newStartMinutes = timeToMinutes(startTime);
+        const newEndMinutes = timeToMinutes(endTime);
+
+        const bufferMinutes = 30;
+		// Buffer 30 menit
+        let isConflict = false;
+		existingBookings.some(existing => {
+            const existingStartMinutes = timeToMinutes(existing.startTime);
+            const existingEndMinutes = timeToMinutes(existing.endTime);
+            
+            const existingEndWithBuffer = existingEndMinutes + bufferMinutes;
+
+            const overlap = 
+                (newStartMinutes < existingEndWithBuffer) && 
+    
+                (newEndMinutes > existingStartMinutes);
+            
+            if (overlap) {
+                console.log(`Conflict detected with booking ending at ${existing.endTime} (+ 30 min buffer)`);
+                isConflict = true; 
+            }
+   
+         return overlap;
+        });
+		if (isConflict) {
 			return res.status(400).json({
-				message: `Ruangan sudah dipesan pada jam ${existingBooking.startTime} - ${existingBooking.endTime}`,
+				message: `Konflik jadwal. Ruangan sudah dipesan, termasuk waktu buffer ${bufferMinutes} menit untuk pembersihan.`,
 			});
 		}
+
 
 		// VALIDASI RUANGAN
 		const room = await Room.findById(roomId);
 		if (!room) {
 			return res.status(404).json({ message: "Ruangan tidak ditemukan" });
+		}
+		if (room.status === "maintenance") {
+			return res
+				.status(400)
+				.json({ message: "Ruangan tidak tersedia karena sedang maintenance." });
 		}
 
 		// Cek apakah ruangan berbayar atau gratis
@@ -222,10 +274,10 @@ exports.bookRoom = async (req, res) => {
 				phone: normalizePhoneNumber(phone),
 				totalPrice: totalPrice,
 				paymentStatus: "unpaid",
-				status: "pending_payment", // Status awal
+				status: "pending_payment", 
 			});
 
-			const orderId = `booking-${booking._id}`; 
+			const orderId = `booking-${booking._id}`;
 			booking.midtransOrderId = orderId;
 			await booking.save();
 
@@ -263,7 +315,6 @@ exports.bookRoom = async (req, res) => {
 				paymentStatus: "paid", // Langsung lunas (gratis)
 				status: "confirmed", // Langsung konfirm
 			});
-			
 			const populatedBooking = await Booking.findById(booking._id)
 				.populate("user", "name email")
 				.populate("room", "name capacity");
@@ -285,4 +336,4 @@ exports.bookRoom = async (req, res) => {
 		}
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});

@@ -1,35 +1,37 @@
 const Announcement = require("../models/Announcement");
+const asyncHandler = require("express-async-handler");
+
 const {
 	sendCustomAnnouncementToAllUsers,
 } = require("../services/emailService");
 
-exports.listAnnouncements = async (req, res) => {
+exports.listAnnouncements = asyncHandler(async (req, res) => {
 	// Return newest first
 	const list = await Announcement.find().sort({ createdAt: -1 }).limit(50);
 	res.json(list);
-};
+});
 
-exports.createAnnouncement = async (req, res) => {
+exports.createAnnouncement = asyncHandler(async (req, res) => {
 	try {
 		// admin only route (enforced by middleware)
-		const { bookTitle, message } = req.body;
+		const { title, message } = req.body;
 
-		if (!bookTitle || !message) {
+		if (!title || !message) {
 			return res.status(400).json({
-				message: "bookTitle and message are required",
+				message: "title and message are required",
 			});
 		}
 
 		// create the announcement
 		const announcement = await Announcement.create({
-			bookTitle,
+			title,
 			message,
 		});
 
 		// Send announcement email to all registered users
 		try {
 			const emailResult = await sendCustomAnnouncementToAllUsers(
-				bookTitle,
+				title,
 				message
 			);
 			console.log(
@@ -61,9 +63,9 @@ exports.createAnnouncement = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
 
-exports.sendAnnouncementEmails = async (req, res) => {
+exports.sendAnnouncementEmails = asyncHandler(async (req, res) => {
 	try {
 		// admin only route (enforced by middleware)
 		const { id } = req.params;
@@ -73,6 +75,9 @@ exports.sendAnnouncementEmails = async (req, res) => {
 		if (!announcement) {
 			return res.status(404).json({ message: "Announcement not found" });
 		}
+
+		const emailTitle = announcement.title || `Announcement: ${announcement.bookTitle}`;
+		const emailMessage = announcement.message;
 
 		// Send announcement email to all registered users
 		try {
@@ -100,4 +105,4 @@ exports.sendAnnouncementEmails = async (req, res) => {
 		console.error(err);
 		res.status(500).json({ message: "Server error" });
 	}
-};
+});
