@@ -12,236 +12,206 @@ const SALT_ROUNDS = 10;
 const asyncHandler = require("express-async-handler");
 
 exports.register = asyncHandler(async (req, res) => {
-	try {
-		const { name, email, password } = req.body;
-		if (!email || !password)
-			return res.status(400).json({ message: "Email & password required" });
+	const { name, email, password } = req.body;
+	if (!email || !password)
+		return res.status(400).json({ message: "Email & password required" });
 
-		const existing = await User.findOne({ email });
-		if (existing)
-			return res.status(400).json({ message: "Email already registered" });
+	const existing = await User.findOne({ email });
+	if (existing)
+		return res.status(400).json({ message: "Email already registered" });
 
-		const hash = await bcrypt.hash(password, SALT_ROUNDS);
-		const otp = generateOTP();
-		const otpExpiration = generateOTPExpiration();
+	const hash = await bcrypt.hash(password, SALT_ROUNDS);
+	const otp = generateOTP();
+	const otpExpiration = generateOTPExpiration();
 
-		// Create user but keep unverified
-		const user = await User.create({
-			name,
-			email,
-			password: hash,
-			role: "user",
-			isVerified: false,
-			otp,
-			otpExpiration,
-		});
+	// Create user but keep unverified
+	const user = await User.create({
+		name,
+		email,
+		password: hash,
+		role: "user",
+		isVerified: false,
+		otp,
+		otpExpiration,
+	});
 
-		// Send OTP email
-		await sendOTPEmail(email, otp, "verification");
+	// Send OTP email (Jika ini gagal, asyncHandler akan menangkapnya)
+	await sendOTPEmail(email, otp, "verification");
 
-		res.json({
-			message:
-				"Registration initiated. Please check your email for OTP verification.",
-			email: user.email,
-			requiresOTP: true,
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+	res.json({
+		message:
+			"Registration initiated. Please check your email for OTP verification.",
+		email: user.email,
+		requiresOTP: true,
+	});
 });
 
 exports.login = asyncHandler(async (req, res) => {
-	try {
-		const { email, password } = req.body;
-		if (!email || !password)
-			return res.status(400).json({ message: "Email & password required" });
+	const { email, password } = req.body;
+	if (!email || !password)
+		return res.status(400).json({ message: "Email & password required" });
 
-		const user = await User.findOne({ email });
-		if (!user || !user.password)
-			return res.status(401).json({ message: "Invalid credentials" });
+	const user = await User.findOne({ email });
+	if (!user || !user.password)
+		return res.status(401).json({ message: "Invalid credentials" });
 
-		const ok = await bcrypt.compare(password, user.password);
-		if (!ok) return res.status(401).json({ message: "Invalid credentials" });
+	const ok = await bcrypt.compare(password, user.password);
+	if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-		// Generate and send OTP for login
-		const otp = generateOTP();
-		const otpExpiration = generateOTPExpiration();
+	// Generate and send OTP for login
+	const otp = generateOTP();
+	const otpExpiration = generateOTPExpiration();
 
-		// Update user with new OTP
-		await User.findByIdAndUpdate(user._id, {
-			otp,
-			otpExpiration,
-		});
+	// Update user with new OTP
+	await User.findByIdAndUpdate(user._id, {
+		otp,
+		otpExpiration,
+	});
 
-		// Send OTP email
-		await sendOTPEmail(email, otp, "login");
+	// Send OTP email
+	await sendOTPEmail(email, otp, "login");
 
-		res.json({
-			message:
-				"Login credentials verified. Please check your email for OTP to complete login.",
-			email: user.email,
-			requiresOTP: true,
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+	res.json({
+		message:
+			"Login credentials verified. Please check your email for OTP to complete login.",
+		email: user.email,
+		requiresOTP: true,
+	});
 });
 
 // Verify OTP for registration and auto-login
 exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
-	try {
-		const { email, otp } = req.body;
-		if (!email || !otp)
-			return res.status(400).json({ message: "Email and OTP required" });
+	const { email, otp } = req.body;
+	if (!email || !otp)
+		return res.status(400).json({ message: "Email and OTP required" });
 
-		const user = await User.findOne({ email });
-		if (!user) return res.status(404).json({ message: "User not found" });
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
 
-		if (user.isVerified)
-			return res.status(400).json({ message: "User already verified" });
+	if (user.isVerified)
+		return res.status(400).json({ message: "User already verified" });
 
-		const otpValidation = validateOTP(user.otp, user.otpExpiration, otp);
-		if (!otpValidation.isValid)
-			return res.status(400).json({ message: otpValidation.message });
+	const otpValidation = validateOTP(user.otp, user.otpExpiration, otp);
+	if (!otpValidation.isValid)
+		return res.status(400).json({ message: otpValidation.message });
 
-		// Mark user as verified and clear OTP
-		await User.findByIdAndUpdate(user._id, {
-			isVerified: true,
-			otp: undefined,
-			otpExpiration: undefined,
-		});
+	// Mark user as verified and clear OTP
+	await User.findByIdAndUpdate(user._id, {
+		isVerified: true,
+		otp: undefined,
+		otpExpiration: undefined,
+	});
 
-		// Auto-login: generate token
-		const token = signToken({
+	// Auto-login: generate token
+	const token = signToken({
+		id: user._id,
+		email: user.email,
+		role: user.role,
+	});
+
+	res.json({
+		message: "Registration completed successfully. You are now logged in.",
+		token,
+		user: {
 			id: user._id,
 			email: user.email,
 			role: user.role,
-		});
-
-		res.json({
-			message: "Registration completed successfully. You are now logged in.",
-			token,
-			user: {
-				id: user._id,
-				email: user.email,
-				role: user.role,
-				name: user.name,
-			},
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+			name: user.name,
+		},
+	});
 });
 
 // Verify OTP for login
 exports.verifyLoginOTP = asyncHandler(async (req, res) => {
-	try {
-		const { email, otp } = req.body;
-		if (!email || !otp)
-			return res.status(400).json({ message: "Email and OTP required" });
+	const { email, otp } = req.body;
+	if (!email || !otp)
+		return res.status(400).json({ message: "Email and OTP required" });
 
-		const user = await User.findOne({ email });
-		if (!user) return res.status(404).json({ message: "User not found" });
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
 
-		const otpValidation = validateOTP(user.otp, user.otpExpiration, otp);
-		if (!otpValidation.isValid)
-			return res.status(400).json({ message: otpValidation.message });
+	const otpValidation = validateOTP(user.otp, user.otpExpiration, otp);
+	if (!otpValidation.isValid)
+		return res.status(400).json({ message: otpValidation.message });
 
-		// Clear OTP after successful verification
-		await User.findByIdAndUpdate(user._id, {
-			otp: undefined,
-			otpExpiration: undefined,
-		});
+	// Clear OTP after successful verification
+	await User.findByIdAndUpdate(user._id, {
+		otp: undefined,
+		otpExpiration: undefined,
+	});
 
-		// Generate token for login
-		const token = signToken({
+	// Generate token for login
+	const token = signToken({
+		id: user._id,
+		email: user.email,
+		role: user.role,
+	});
+
+	res.json({
+		message: "Login successful",
+		token,
+		user: {
 			id: user._id,
 			email: user.email,
 			role: user.role,
-		});
-
-		res.json({
-			message: "Login successful",
-			token,
-			user: {
-				id: user._id,
-				email: user.email,
-				role: user.role,
-				name: user.name,
-			},
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+			name: user.name,
+		},
+	});
 });
 
 // Resend OTP for registration
 exports.resendRegistrationOTP = asyncHandler(async (req, res) => {
-	try {
-		const { email } = req.body;
-		if (!email) return res.status(400).json({ message: "Email required" });
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ message: "Email required" });
 
-		const user = await User.findOne({ email });
-		if (!user) return res.status(404).json({ message: "User not found" });
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
 
-		if (user.isVerified)
-			return res.status(400).json({ message: "User already verified" });
+	if (user.isVerified)
+		return res.status(400).json({ message: "User already verified" });
 
-		// Generate new OTP
-		const otp = generateOTP();
-		const otpExpiration = generateOTPExpiration();
+	// Generate new OTP
+	const otp = generateOTP();
+	const otpExpiration = generateOTPExpiration();
 
-		// Update user with new OTP
-		await User.findByIdAndUpdate(user._id, {
-			otp,
-			otpExpiration,
-		});
+	// Update user with new OTP
+	await User.findByIdAndUpdate(user._id, {
+		otp,
+		otpExpiration,
+	});
 
-		// Send new OTP email
-		await sendOTPEmail(email, otp, "verification");
+	// Send new OTP email
+	await sendOTPEmail(email, otp, "verification");
 
-		res.json({
-			message: "OTP resent successfully. Please check your email.",
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+	res.json({
+		message: "OTP resent successfully. Please check your email.",
+	});
 });
 
 // Resend OTP for login
 exports.resendLoginOTP = asyncHandler(async (req, res) => {
-	try {
-		const { email } = req.body;
-		if (!email) return res.status(400).json({ message: "Email required" });
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ message: "Email required" });
 
-		const user = await User.findOne({ email });
-		if (!user) return res.status(404).json({ message: "User not found" });
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
 
-		// Generate new OTP
-		const otp = generateOTP();
-		const otpExpiration = generateOTPExpiration();
+	// Generate new OTP
+	const otp = generateOTP();
+	const otpExpiration = generateOTPExpiration();
 
-		// Update user with new OTP
-		await User.findByIdAndUpdate(user._id, {
-			otp,
-			otpExpiration,
-		});
+	// Update user with new OTP
+	await User.findByIdAndUpdate(user._id, {
+		otp,
+		otpExpiration,
+	});
 
-		// Send new OTP email
-		await sendOTPEmail(email, otp, "login");
+	// Send new OTP email
+	await sendOTPEmail(email, otp, "login");
 
-		res.json({
-			message: "Login OTP resent successfully. Please check your email.",
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+	res.json({
+		message: "Login OTP resent successfully. Please check your email.",
+	});
 });
 
 // OAuth success handler - used by /auth/google/callback route to redirect
