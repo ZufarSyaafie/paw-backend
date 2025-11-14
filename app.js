@@ -20,7 +20,8 @@ const loanRoutes = require("./src/routes/loanRoutes");
 const app = express();
 const allowedOrigins = [
 	'http://localhost:3000',
-	'https://naratama.netlify.app'
+	'https://naratama.netlify.app',
+	'https://perpus-naratama.netlify.app'
 ];
 
 app.use(cors({ 

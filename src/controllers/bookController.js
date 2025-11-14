@@ -69,11 +69,9 @@ exports.getBook = asyncHandler(async (req, res) => {
 });
 
 exports.createBook = asyncHandler(async (req, res) => {
-	// (admin only route - enforced by middleware)
 	const payload = req.body;
 	const book = await Book.create(payload);
 
-	// create an announcement automatically about new book
 	const announcement = await Announcement.create({
 		bookTitle: book.title,
 		message: `Buku baru: "${book.title}" oleh ${book.author || "Unknown author"} sekarang tersedia.`,
@@ -86,7 +84,7 @@ exports.createBook = asyncHandler(async (req, res) => {
 		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to send announcement emails:", emailError.message);
 	}
 
-	res.status(201).json(book); // Tetep kirim 201 (Created)
+	res.status(201).json(book);
 });
 
 exports.updateBook = asyncHandler(async (req, res) => {
@@ -102,7 +100,6 @@ exports.deleteBook = asyncHandler(async (req, res) => {
 	res.json({ message: "Deleted" });
 });
 
-// Borrow with Midtrans
 exports.borrowBook = asyncHandler(async (req, res) => {
 	const userId = req.user.id;
 	const bookId = req.params.id;
@@ -123,6 +120,7 @@ exports.borrowBook = asyncHandler(async (req, res) => {
 	const loan = await Loan.create({
 		user: new mongoose.Types.ObjectId(userId),
 		book: new mongoose.Types.ObjectId(bookId),
+		dueDate: dueDate, // <-- INI FIX-NYA
 		depositAmount: 25000,
 		paymentStatus: "unpaid",
 		refundStatus: "pending",
@@ -149,7 +147,6 @@ exports.borrowBook = asyncHandler(async (req, res) => {
 	});
 });
 
-// Return book + refund
 exports.returnBook = asyncHandler(async (req, res) => {
 	const loanId = req.params.id;
 	const loan = await Loan.findById(loanId).populate("book");
