@@ -19,6 +19,7 @@ const loanSchema = new mongoose.Schema({
 		enum: ["pending", "refunded", "forfeited"],
 		default: "pending",
 	},
+	fineAmount: { type: Number, default: 0 },
 });
 
 module.exports = mongoose.model("Loan", loanSchema);

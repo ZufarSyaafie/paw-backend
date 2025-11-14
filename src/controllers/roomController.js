@@ -139,6 +139,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
 		}
 
 		booking.status = "cancelled";
+		booking.cancelledAt = new Date();
 		await booking.save();
 
 		res.json({

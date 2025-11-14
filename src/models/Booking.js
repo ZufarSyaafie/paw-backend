@@ -23,6 +23,7 @@ const bookingSchema = new mongoose.Schema({
 		default: "pending_payment",
 	},
 	createdAt: { type: Date, default: Date.now },
+	cancelledAt: Date,
 });
 
 module.exports = mongoose.model("Booking", bookingSchema);
