@@ -15,6 +15,9 @@ router.post("/verify-login-otp", authController.verifyLoginOTP);
 router.post("/resend-registration-otp", authController.resendRegistrationOTP);
 router.post("/resend-login-otp", authController.resendLoginOTP);
 
+// logout
+router.post("/logout", authController.logout);
+
 // google oauth
 router.get(
 	"/google",

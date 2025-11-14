@@ -2,12 +2,16 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const secret = process.env.JWT_SECRET || "jwt-secret-key";
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "token";
 
 function authenticate(allowedRoles = []) {
 	// allowedRoles: [] => any authenticated user, ['admin'] => only admin
 	return (req, res, next) => {
 		const header = req.headers.authorization || "";
-		const token = header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+		let token = header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+		if (!token && req.cookies) {
+			token = req.cookies[COOKIE_NAME] || null;
+		}
 		if (!token) return res.status(401).json({ message: "Unauthorized" });
 
 		try {
@@ -26,7 +30,10 @@ function authenticate(allowedRoles = []) {
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
 	const header = req.headers.authorization || "";
-	const token = header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+	let token = header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+	if (!token && req.cookies) {
+		token = req.cookies[COOKIE_NAME] || null;
+	}
 
 	if (!token) {
 		return res
