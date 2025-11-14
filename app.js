@@ -18,9 +18,19 @@ const userRoutes = require("./src/routes/userRoutes");
 const loanRoutes = require("./src/routes/loanRoutes");
 
 const app = express();
+const allowedOrigins = [
+	'http://localhost:3000',
+	'https://naratama.netlify.app'
+];
 
 app.use(cors({ 
-  origin: 'http://localhost:3000', 
+  origin: (origin, callback) => {
+	  if (allowedOrigins.includes(origin) || !origin) {
+		  callback(null, true);
+	  } else {
+		  callback (new Error('Not allowed by CORS'));
+	  }
+  },
   credentials: true 
 }));
 
