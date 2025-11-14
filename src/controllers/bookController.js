@@ -19,44 +19,44 @@ const getTopCategories = asyncHandler(async (req, res) => {
 });
 
 exports.listBooks = asyncHandler(async (req, res) => {
-    const { sortBy, order = "asc", page = 1, limit = 20, search, ...queries } = req.query;
-    
-    const filter = {};
-    if (search) {
-        const regex = new RegExp(search, "i");
-        filter.$or = [
-            { title: regex },
-            { author: regex },
-            { isbn: regex },
-            { description: regex },
-        ];
-    }
-    for (const key in queries) {
-        if (["createdAt", "__v", "_id"].includes(key)) continue;
-        if (["year", "stock"].includes(key)) {
-            filter[key] = parseInt(queries[key]);
-        } else {
-            if (key === 'status') {
-              filter[key] = queries[key];
-            } else {
-              filter[key] = new RegExp(queries[key], "i");
-            }
-        }
-    }
+	const { sortBy, order = "asc", page = 1, limit = 20, search, ...queries } = req.query;
+	
+	const filter = {};
+	if (search) {
+		const regex = new RegExp(search, "i");
+		filter.$or = [
+			{ title: regex },
+			{ author: regex },
+			{ isbn: regex },
+			{ description: regex },
+		];
+	}
+	for (const key in queries) {
+		if (["createdAt", "__v", "_id"].includes(key)) continue;
+		if (["year", "stock"].includes(key)) {
+			filter[key] = parseInt(queries[key]);
+		} else {
+			if (key === 'status') {
+			  filter[key] = queries[key];
+			} else {
+			  filter[key] = new RegExp(queries[key], "i");
+			}
+		}
+	}
 
-    const sort = {};
-    if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
+	const sort = {};
+	if (sortBy) sort[sortBy] = order === "asc" ? 1 : -1;
 
-    const [books, totalCount] = await Promise.all([
-        Book.find(filter)
-            .sort(sort)
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit))
-            .lean(),
-        Book.countDocuments(filter) 
-    ]);
+	const [books, totalCount] = await Promise.all([
+		Book.find(filter)
+			.sort(sort)
+			.skip((page - 1) * limit)
+			.limit(parseInt(limit))
+			.lean(),
+		Book.countDocuments(filter) 
+	]);
 
-    res.json({ data: books, total: totalCount });
+	res.json({ data: books, total: totalCount });
 });
 
 exports.getBook = asyncHandler(async (req, res) => {
@@ -69,30 +69,24 @@ exports.getBook = asyncHandler(async (req, res) => {
 });
 
 exports.createBook = asyncHandler(async (req, res) => {
+	// (admin only route - enforced by middleware)
+	const payload = req.body;
+	const book = await Book.create(payload);
+
+	// create an announcement automatically about new book
+	const announcement = await Announcement.create({
+		bookTitle: book.title,
+		message: `Buku baru: "${book.title}" oleh ${book.author || "Unknown author"} sekarang tersedia.`,
+	});
+
 	try {
-		// admin only route (enforced by middleware)
-		const payload = req.body;
-		const book = await Book.create(payload);
-
-		// create an announcement automatically about new book
-		const announcement = await Announcement.create({
-			bookTitle: book.title,
-			message: `Buku baru: "${book.title}" oleh ${book.author || "Unknown author"} sekarang tersedia.`,
-		});
-
-		// Send announcement email to all registered users
-		try {
-			const emailResult = await sendAnnouncementToAllUsers(announcement);
-			console.log(`Email announcement sent to ${emailResult.sent} users`);
-		} catch (emailError) {
-			console.error("Failed to send announcement emails:", emailError.message);
-		}
-
-		res.status(201).json(book);
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
+		const emailResult = await sendAnnouncementToAllUsers(announcement);
+		console.log(`Email announcement sent to ${emailResult.sent} users`);
+	} catch (emailError) {
+		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to send announcement emails:", emailError.message);
 	}
+
+	res.status(201).json(book); // Tetep kirim 201 (Created)
 });
 
 exports.updateBook = asyncHandler(async (req, res) => {
@@ -110,113 +104,94 @@ exports.deleteBook = asyncHandler(async (req, res) => {
 
 // Borrow with Midtrans
 exports.borrowBook = asyncHandler(async (req, res) => {
-	try {
-		const userId = req.user.id;
-		const bookId = req.params.id;
-		// due date 7 days from now
-		const dueDate = new Date();
-		dueDate.setDate(dueDate.getDate() + 7);
+	const userId = req.user.id;
+	const bookId = req.params.id;
+	const dueDate = new Date();
+	dueDate.setDate(dueDate.getDate() + 7);
 
-		const book = await Book.findById(bookId);
-		if (!book) {
-			return res.status(404).json({ message: "Book not found" });
-		}
-		if (book.status === 'unavailable') {
-			return res.status(400).json({ message: "Book is currently unavailable" });
-		}
-		if (book.stock <= 0) {
-			return res.status(400).json({ message: "Book out of stock" });
-		}
-
-		// buat loan entry unpaid
-		const loan = await Loan.create({
-			user: new mongoose.Types.ObjectId(userId),
-			book: new mongoose.Types.ObjectId(bookId),
-			depositAmount: 25000,
-			paymentStatus: "unpaid",
-			refundStatus: "pending",
-		});
-
-		// buat orderId valid
-		const orderId = `loan-${loan._id}`;
-		loan.midtransOrderId = orderId;
-		await loan.save();
-
-		// transaksi ke midtrans
-		const parameter = {
-			transaction_details: {
-				order_id: orderId,
-				gross_amount: 25000,
-			},
-			customer_details: {
-				email: req.user.email,
-			},
-		};
-
-		const transaction = await snap.createTransaction(parameter);
-		res.json({
-			loan,
-			payment_url: transaction.redirect_url,
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
+	const book = await Book.findById(bookId);
+	if (!book) {
+		return res.status(404).json({ message: "Book not found" });
 	}
+	if (book.status === 'unavailable') {
+		return res.status(400).json({ message: "Book is currently unavailable" });
+	}
+	if (book.stock <= 0) {
+		return res.status(400).json({ message: "Book out of stock" });
+	}
+
+	const loan = await Loan.create({
+		user: new mongoose.Types.ObjectId(userId),
+		book: new mongoose.Types.ObjectId(bookId),
+		depositAmount: 25000,
+		paymentStatus: "unpaid",
+		refundStatus: "pending",
+	});
+
+	const orderId = `loan-${loan._id}`;
+	loan.midtransOrderId = orderId;
+	await loan.save();
+
+	const parameter = {
+		transaction_details: {
+			order_id: orderId,
+			gross_amount: 25000,
+		},
+		customer_details: {
+			email: req.user.email,
+		},
+	};
+
+	const transaction = await snap.createTransaction(parameter);
+	res.json({
+		loan,
+		payment_url: transaction.redirect_url,
+	});
 });
 
 // Return book + refund
 exports.returnBook = asyncHandler(async (req, res) => {
-	try {
-		const loanId = req.params.id;
-		const loan = await Loan.findById(loanId).populate("book");
-		if (!loan) return res.status(404).json({ message: "Loan not found" });
+	const loanId = req.params.id;
+	const loan = await Loan.findById(loanId).populate("book");
+	if (!loan) return res.status(404).json({ message: "Loan not found" });
 
-		loan.returnedAt = new Date();
-		loan.status = "returned";
+	loan.returnedAt = new Date();
+	loan.status = "returned";
 
-		if (loan.dueDate && loan.returnedAt > loan.dueDate) {
-			loan.refundStatus = "forfeited";
-		} else {
-			if (loan.paymentStatus === "paid") {
-				try {
-					const refundResponse = await core.refundTransaction(
-						{ order_id: loan.midtransOrderId },
-						{
-							refund_key: `refund-${loan._id}-${Date.now()}`,
-							amount: loan.depositAmount,
-							reason: "On-time return",
-						}
-					);
-					console.log("Refund response:", refundResponse);
-					loan.refundStatus = "refunded";
-				} catch (refundErr) {
-					console.error("Refund failed:", refundErr);
-					loan.refundStatus = "pending";
-				}
-			} else {
-				loan.refundStatus = "no_payment_made";
+	if (loan.dueDate && loan.returnedAt > loan.dueDate) {
+		loan.refundStatus = "forfeited";
+	} else {
+		if (loan.paymentStatus === "paid") {
+			try {
+				const refundResponse = await core.refundTransaction(
+					{ order_id: loan.midtransOrderId },
+					{
+						refund_key: `refund-${loan._id}-${Date.now()}`,
+						amount: loan.depositAmount,
+						reason: "On-time return",
+					}
+				);
+				console.log("Refund response:", refundResponse);
+				loan.refundStatus = "refunded";
+			} catch (refundErr) {
+				console.error("Refund failed:", refundErr);
+				loan.refundStatus = "pending";
 			}
+		} else {
+			loan.refundStatus = "no_payment_made";
 		}
-
-		await Book.findByIdAndUpdate(loan.book._id, { $inc: { stock: 1 } });
-		await loan.save();
-
-		res.json({ message: "Book returned", loan });
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
 	}
+
+	await Book.findByIdAndUpdate(loan.book._id, { $inc: { stock: 1 } });
+	await loan.save();
+
+	res.json({ message: "Book returned", loan });
 });
 
 exports.getCategories = asyncHandler(async (req, res) => {
-	try {
-		const categories = await Book.distinct("category");
-		const filteredCategories = categories.filter(cat => cat);
-		res.json(filteredCategories);
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
-	}
+	const categories = await Book.distinct("category");
+	const filteredCategories = categories.filter(cat => cat);
+	res.json(filteredCategories);
 });
 
 exports.getTopCategories = getTopCategories;

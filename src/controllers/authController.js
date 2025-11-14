@@ -24,7 +24,6 @@ exports.register = asyncHandler(async (req, res) => {
 	const otp = generateOTP();
 	const otpExpiration = generateOTPExpiration();
 
-	// Create user but keep unverified
 	const user = await User.create({
 		name,
 		email,
@@ -35,14 +34,21 @@ exports.register = asyncHandler(async (req, res) => {
 		otpExpiration,
 	});
 
-	// Send OTP email (Jika ini gagal, asyncHandler akan menangkapnya)
-	await sendOTPEmail(email, otp, "verification");
+    let demoOtpForFallback = null;
+	try {
+        // 1. Dia nyoba kirim email
+	    await sendOTPEmail(email, otp, "verification");
+    } catch (err) {
+        // 2. Kalo GAGAL (pasti ETIMEDOUT), dia gak crash
+        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+        demoOtpForFallback = otp; // 3. Simpen OTP-nya buat dibocorin
+    }
 
 	res.json({
-		message:
-			"Registration initiated. Please check your email for OTP verification.",
+		message: "Registration initiated.",
 		email: user.email,
 		requiresOTP: true,
+        demoOtp: demoOtpForFallback // 4. Kirim OTP-nya (atau null kalo email sukses)
 	});
 });
 
@@ -58,28 +64,30 @@ exports.login = asyncHandler(async (req, res) => {
 	const ok = await bcrypt.compare(password, user.password);
 	if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-	// Generate and send OTP for login
 	const otp = generateOTP();
 	const otpExpiration = generateOTPExpiration();
 
-	// Update user with new OTP
 	await User.findByIdAndUpdate(user._id, {
 		otp,
 		otpExpiration,
 	});
 
-	// Send OTP email
-	await sendOTPEmail(email, otp, "login");
+    let demoOtpForFallback = null;
+	try {
+	    await sendOTPEmail(email, otp, "login");
+    } catch (err) {
+        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+        demoOtpForFallback = otp;
+    }
 
 	res.json({
-		message:
-			"Login credentials verified. Please check your email for OTP to complete login.",
+		message: "Login credentials verified.",
 		email: user.email,
 		requiresOTP: true,
+        demoOtp: demoOtpForFallback
 	});
 });
 
-// Verify OTP for registration and auto-login
 exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 	const { email, otp } = req.body;
 	if (!email || !otp)
@@ -95,14 +103,12 @@ exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 	if (!otpValidation.isValid)
 		return res.status(400).json({ message: otpValidation.message });
 
-	// Mark user as verified and clear OTP
 	await User.findByIdAndUpdate(user._id, {
 		isVerified: true,
 		otp: undefined,
 		otpExpiration: undefined,
 	});
 
-	// Auto-login: generate token
 	const token = signToken({
 		id: user._id,
 		email: user.email,
@@ -121,7 +127,6 @@ exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 	});
 });
 
-// Verify OTP for login
 exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 	const { email, otp } = req.body;
 	if (!email || !otp)
@@ -134,13 +139,11 @@ exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 	if (!otpValidation.isValid)
 		return res.status(400).json({ message: otpValidation.message });
 
-	// Clear OTP after successful verification
 	await User.findByIdAndUpdate(user._id, {
 		otp: undefined,
 		otpExpiration: undefined,
 	});
 
-	// Generate token for login
 	const token = signToken({
 		id: user._id,
 		email: user.email,
@@ -159,72 +162,62 @@ exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 	});
 });
 
-// Resend OTP for registration
 exports.resendRegistrationOTP = asyncHandler(async (req, res) => {
 	const { email } = req.body;
 	if (!email) return res.status(400).json({ message: "Email required" });
-
 	const user = await User.findOne({ email });
 	if (!user) return res.status(404).json({ message: "User not found" });
-
 	if (user.isVerified)
 		return res.status(400).json({ message: "User already verified" });
 
-	// Generate new OTP
 	const otp = generateOTP();
 	const otpExpiration = generateOTPExpiration();
+	await User.findByIdAndUpdate(user._id, { otp, otpExpiration });
 
-	// Update user with new OTP
-	await User.findByIdAndUpdate(user._id, {
-		otp,
-		otpExpiration,
-	});
-
-	// Send new OTP email
-	await sendOTPEmail(email, otp, "verification");
+    let demoOtpForFallback = null;
+    try {
+	    await sendOTPEmail(email, otp, "verification");
+    } catch (err) {
+        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+        demoOtpForFallback = otp;
+    }
 
 	res.json({
-		message: "OTP resent successfully. Please check your email.",
+		message: "OTP 'resent' (DEMO MODE).",
+        demoOtp: demoOtpForFallback
 	});
 });
 
-// Resend OTP for login
 exports.resendLoginOTP = asyncHandler(async (req, res) => {
 	const { email } = req.body;
 	if (!email) return res.status(400).json({ message: "Email required" });
-
 	const user = await User.findOne({ email });
 	if (!user) return res.status(404).json({ message: "User not found" });
 
-	// Generate new OTP
 	const otp = generateOTP();
 	const otpExpiration = generateOTPExpiration();
+	await User.findByIdAndUpdate(user._id, { otp, otpExpiration });
 
-	// Update user with new OTP
-	await User.findByIdAndUpdate(user._id, {
-		otp,
-		otpExpiration,
-	});
-
-	// Send new OTP email
-	await sendOTPEmail(email, otp, "login");
+    let demoOtpForFallback = null;
+    try {
+	    await sendOTPEmail(email, otp, "login");
+    } catch (err) {
+        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+        demoOtpForFallback = otp;
+    }
 
 	res.json({
-		message: "Login OTP resent successfully. Please check your email.",
+		message: "Login OTP 'resent' (DEMO MODE).",
+        demoOtp: demoOtpForFallback
 	});
 });
 
-// OAuth success handler - used by /auth/google/callback route to redirect
 exports.googleCallbackSuccess = (req, res) => {
-	// passport strategy attached token and user to req.user
 	if (!req.user) return res.status(500).send("No user data from Google OAuth");
 	const token = req.user.token;
-	// If requests come from browser, redirect to frontend with token
 	const redirectUrl = process.env.FRONTEND_SUCCESS_REDIRECT;
 	if (redirectUrl) {
-		// redirect with token in query param
 		return res.redirect(`${redirectUrl}?token=${token}`);
 	}
-	// fallback: send JSON
 	res.json({ token });
 };

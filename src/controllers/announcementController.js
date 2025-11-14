@@ -1,6 +1,5 @@
 const Announcement = require("../models/Announcement");
 const asyncHandler = require("express-async-handler");
-
 const {
 	sendCustomAnnouncementToAllUsers,
 } = require("../services/emailService");
@@ -12,97 +11,88 @@ exports.listAnnouncements = asyncHandler(async (req, res) => {
 });
 
 exports.createAnnouncement = asyncHandler(async (req, res) => {
-	try {
-		// admin only route (enforced by middleware)
-		const { title, message } = req.body;
+	// (admin only route - enforced by middleware)
+	const { title, message } = req.body; // Pake 'title' yg udah kita benerin
 
-		if (!title || !message) {
-			return res.status(400).json({
-				message: "title and message are required",
-			});
-		}
-
-		// create the announcement
-		const announcement = await Announcement.create({
-			title,
-			message,
+	if (!title || !message) {
+		return res.status(400).json({
+			message: "title and message are required",
 		});
-
-		// Send announcement email to all registered users
-		try {
-			const emailResult = await sendCustomAnnouncementToAllUsers(
-				title,
-				message
-			);
-			console.log(
-				`Custom announcement email sent to ${emailResult.sent} users`
-			);
-
-			res.status(201).json({
-				announcement,
-				emailResult: {
-					sent: emailResult.sent,
-					failed: emailResult.failed,
-					total: emailResult.total,
-				},
-			});
-		} catch (emailError) {
-			console.error("Failed to send announcement emails:", emailError.message);
-			// Return the announcement even if email sending fails
-			res.status(201).json({
-				announcement,
-				emailResult: {
-					sent: 0,
-					failed: 0,
-					total: 0,
-					error: emailError.message,
-				},
-			});
-		}
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
 	}
+
+	// create the announcement
+	const announcement = await Announcement.create({
+		title, // Pake 'title'
+		message,
+	});
+
+	// FALLBACK LOGIC
+	let emailResultStatus = {};
+	try {
+		const emailResult = await sendCustomAnnouncementToAllUsers(
+			title,
+			message
+		);
+		console.log(
+			`Custom announcement email sent to ${emailResult.sent} users`
+		);
+		emailResultStatus = {
+			sent: emailResult.sent,
+			failed: emailResult.failed,
+			total: emailResult.total,
+		};
+	} catch (emailError) {
+        // Silent Fail
+		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to send custom announcement:", emailError.message);
+		emailResultStatus = {
+			sent: 0,
+			failed: 0,
+			total: 0,
+			error: "Email service failed (ETIMEDOUT), announcement created without email.",
+		};
+	}
+
+	res.status(201).json({
+		announcement,
+		emailResult: emailResultStatus, // Kirim status email (sukses atau gagal)
+	});
 });
 
 exports.sendAnnouncementEmails = asyncHandler(async (req, res) => {
+	// (admin only route - enforced by middleware)
+	const { id } = req.params;
+
+	// Find the announcement
+	const announcement = await Announcement.findById(id);
+	if (!announcement) {
+		return res.status(404).json({ message: "Announcement not found" });
+	}
+
+    // FALLBACK BUAT JUDUL
+	const emailTitle = announcement.title || announcement.bookTitle;
+	const emailMessage = announcement.message;
+
+	// FALLBACK LOGIC (Silent Fail)
 	try {
-		// admin only route (enforced by middleware)
-		const { id } = req.params;
+		const emailResult = await sendCustomAnnouncementToAllUsers(
+			emailTitle, 
+			emailMessage
+		);
 
-		// Find the announcement
-		const announcement = await Announcement.findById(id);
-		if (!announcement) {
-			return res.status(404).json({ message: "Announcement not found" });
-		}
-
-		const emailTitle = announcement.title || `Announcement: ${announcement.bookTitle}`;
-		const emailMessage = announcement.message;
-
-		// Send announcement email to all registered users
-		try {
-			const emailResult = await sendCustomAnnouncementToAllUsers(
-				announcement.bookTitle,
-				announcement.message
-			);
-
-			res.json({
-				message: "Announcement emails sent successfully",
-				emailResult: {
-					sent: emailResult.sent,
-					failed: emailResult.failed,
-					total: emailResult.total,
-				},
-			});
-		} catch (emailError) {
-			console.error("Failed to send announcement emails:", emailError.message);
-			res.status(500).json({
-				message: "Failed to send announcement emails",
-				error: emailError.message,
-			});
-		}
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Server error" });
+		res.json({
+			message: "Announcement emails sent successfully",
+			emailResult: {
+				sent: emailResult.sent,
+				failed: emailResult.failed,
+				total: emailResult.total,
+			},
+		});
+	} catch (emailError) {
+		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to resend announcement emails:", emailError.message);
+        // Kalo gagal, kirim 500 tapi kasih tau emailnya
+		res.status(500).json({
+			message: "Failed to send announcement emails (Service Error)",
+			error: emailError.message,
+		});
 	}
 });
