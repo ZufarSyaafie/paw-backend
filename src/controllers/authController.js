@@ -127,6 +127,7 @@ exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
+		authMethod: 'local',
 	});
 
 	// set httpOnly cookie for auth
@@ -165,6 +166,7 @@ exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
+		authMethod: 'local',
 	});
 
 	// set httpOnly cookie for auth
