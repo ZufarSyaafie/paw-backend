@@ -36,19 +36,17 @@ exports.register = asyncHandler(async (req, res) => {
 
     let demoOtpForFallback = null;
 	try {
-        // 1. Dia nyoba kirim email
 	    await sendOTPEmail(email, otp, "verification");
     } catch (err) {
-        // 2. Kalo GAGAL (pasti ETIMEDOUT), dia gak crash
         console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
-        demoOtpForFallback = otp; // 3. Simpen OTP-nya buat dibocorin
+        demoOtpForFallback = otp; 
     }
 
 	res.json({
 		message: "Registration initiated.",
 		email: user.email,
 		requiresOTP: true,
-        demoOtp: demoOtpForFallback // 4. Kirim OTP-nya (atau null kalo email sukses)
+        demoOtp: demoOtpForFallback 
 	});
 });
 
