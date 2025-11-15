@@ -56,7 +56,7 @@ Backend API modern untuk Sistem Perpustakaan Naratama dengan fitur lengkap melip
 - **Framework:** Express.js
 - **Database:** MongoDB dengan Mongoose
 - **Authentication:** JWT, Passport.js (Google OAuth)
-- **Email:** Nodemailer
+- **Email:** Resend
 - **Payment:** Midtrans
 - **Date Handling:** date-fns
 - **Security:** bcrypt, OTP verification
@@ -110,9 +110,11 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 MIDTRANS_SERVER_KEY=your-midtrans-server-key
 MIDTRANS_CLIENT_KEY=your-midtrans-client-key
 
-# Email Configuration
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-gmail-app-password
+# Email Configuration (Resend)
+RESEND_API_KEY=your-resend-api-key
+# Use a verified domain sender for production, e.g. "Perpustakaan Naratama <noreply@yourdomain.com>"
+# For development you can use the sandbox sender below
+EMAIL_FROM=onboarding@resend.dev
 ```
 
 ## 🌐 API Endpoints Overview
@@ -295,14 +297,13 @@ This project is licensed under the ISC License.
 - 23/517440/TK/56918 | Syifa Alifiya
 - 23/515523/TK/56680 | Kistosi Al Ghifari
 
-
 ## 🚀 Quick Start Guide
 
 ### 1. **Prerequisites**
 
 - Node.js v16+ dan npm
 - MongoDB v4.4+
-- Gmail account untuk email service
+- Resend account untuk email service
 - Midtrans account untuk payment gateway
 
 ### 2. **Installation & Setup**
@@ -329,7 +330,7 @@ npm run dev
 
 1. **Database**: Akan otomatis create collections saat pertama dijalankan
 2. **Admin User**: Register user pertama, kemudian manual ubah role ke 'admin' di database
-3. **Email Service**: Setup Gmail App Password di .env file
+3. **Email Service**: Setup Resend API Key di .env file dan gunakan sender domain terverifikasi untuk produksi
 4. **Midtrans**: Setup Server Key dan Client Key untuk payment
 
 ## 🎯 User Workflows
@@ -389,9 +390,9 @@ sudo systemctl start mongod
 #### Email Not Sending
 
 ```bash
-# Check Gmail App Password
-# Verify EMAIL_USER and EMAIL_PASS in .env
-# Test with: node test-email.js
+# Verify RESEND_API_KEY di .env
+# Set EMAIL_FROM ke domain terverifikasi (production) atau gunakan onboarding@resend.dev untuk testing
+# Cek logs server untuk error dari Resend (rate limit, domain belum terverifikasi, dsb.)
 ```
 
 #### Midtrans Payment Issues
@@ -416,11 +417,12 @@ sudo systemctl start mongod
 - **Lines of Code**: ~3000+ lines
 - **API Endpoints**: 20+ endpoints
 - **Security Features**: OTP, JWT, Role-based access
-- **Integrations**: MongoDB, Midtrans, Gmail
+- **Integrations**: MongoDB, Midtrans, Resend
 
 **🏆 Perpustakaan Naratama Backend API** - Modern library system dengan security tinggi, email automation, dan intelligent room booking system.
 
 ## 📁 File Laporan Backend
+
 Berikut merupakan file laporan dari proyek backend Perpustakaan Naratama:
 
 [📌Lihat file laporan disini!](https://drive.google.com/drive/folders/1chgktU5-nEmh4njCAPTzf73LAFJq1_xZ?usp=sharing)

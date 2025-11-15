@@ -1,38 +1,30 @@
-const nodemailer = require("nodemailer");
-const crypto = require("crypto");
+const { Resend } = require("resend");
 
 // Generate 6-digit OTP
 const generateOTP = () => {
 	return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Create transporter for sending emails
-const createTransporter = () => {
-	return nodemailer.createTransport({
-		service: "gmail", // or your preferred email service
-		auth: {
-			user: process.env.EMAIL_USER,
-			pass: process.env.EMAIL_PASS, // Use App Password for Gmail
-		},
-	});
-};
+// Initialize Resend client
+const resend = new Resend(process.env.RESEND_API_KEY);
+const EMAIL_FROM =
+	process.env.EMAIL_FROM ||
+	process.env.EMAIL_USER ||
+	"Perpustakaan Naratama <onboarding@resend.dev>";
 
 // Send OTP via email
 const sendOTPEmail = async (email, otp, type = "verification") => {
 	try {
-		const transporter = createTransporter();
-
 		const subject =
 			type === "login" ? "Login Verification Code" : "Email Verification Code";
 		const message =
 			type === "login"
 				? `Your login verification code is: ${otp}. This code will expire in 10 minutes.`
 				: `Your verification code is: ${otp}. This code will expire in 10 minutes.`;
-
-		const mailOptions = {
-			from: process.env.EMAIL_USER,
-			to: email,
-			subject: subject,
+		const { error } = await resend.emails.send({
+			from: EMAIL_FROM,
+			to: [email],
+			subject,
 			html: `
 				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
 					<h2 style="color: #333;">Perpustakaan Naratama</h2>
@@ -45,9 +37,8 @@ const sendOTPEmail = async (email, otp, type = "verification") => {
 					</p>
 				</div>
 			`,
-		};
-
-		await transporter.sendMail(mailOptions);
+		});
+		if (error) throw new Error(error.message || "Resend send failed");
 		console.log(`OTP sent to ${email}`);
 		return true;
 	} catch (error) {
