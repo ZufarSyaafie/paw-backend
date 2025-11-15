@@ -32,12 +32,34 @@ const connectDB = async () => {
 			// Recommended options for modern mongoose (some are defaults in v7+ but explicit helps)
 			// useNewUrlParser/useUnifiedTopology are no-ops in Mongoose 7+, kept for clarity
 			// Connect timeout: try to fail faster if there's a network/DNS/auth issue
-			serverSelectionTimeoutMS: 5000, // 5s
-			connectTimeoutMS: 10000, // 10s
+			// Increase a bit for serverless environments (cold starts / DNS lookups)
+			serverSelectionTimeoutMS: 15000, // 15s
+			connectTimeoutMS: 15000, // 15s
+			// Socket timeout for operations
+			socketTimeoutMS: 45000, // 45s
+			// How long to wait while buffering operations (increase to avoid 'buffering timed out')
+			bufferTimeoutMS: 60000, // 60s
+			// Keep buffering commands until connected (true) or fail fast (false)
+			bufferCommands: true,
+			// Limit connection pool size to a small number for serverless environments
+			maxPoolSize: 10,
+			// Retry writes where supported
+			retryWrites: true,
+			// Force IPv4 resolution in environments where IPv6 DNS causes issues
+			family: 4,
 			// autoIndex: false, // disable in production if indexes are managed separately
 		};
 
-		console.log("Connecting to MongoDB...");
+		// Log the host(s) portion of the connection string (masked) to help debug DNS/whitelist issues
+		const maskHost = (uri) => {
+			try {
+				const afterAt = uri.includes("@") ? uri.split("@").pop() : uri;
+				return afterAt.split("/")[0];
+			} catch (e) {
+				return "unknown";
+			}
+		};
+		console.log(`Connecting to MongoDB host(s): ${maskHost(MONGO_URI)}`);
 		cached.promise = mongoose
 			.connect(MONGO_URI, opts)
 			.then((mongooseInstance) => {
