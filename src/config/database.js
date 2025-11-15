@@ -21,9 +21,9 @@ const connectDB = async () => {
 
 	try {
 		// Set mongoose options
-		mongoose.set('strictQuery', false);
-		mongoose.set('bufferCommands', false); // Disable buffering
-		
+		mongoose.set("strictQuery", false);
+		mongoose.set("bufferCommands", false); // Disable buffering
+
 		await mongoose.connect(MONGO_URI, {
 			serverSelectionTimeoutMS: 30000,
 			socketTimeoutMS: 45000,
@@ -31,22 +31,21 @@ const connectDB = async () => {
 			minPoolSize: 2,
 			family: 4,
 		});
-		
+
 		isConnected = true;
 		console.log("MongoDB connected successfully");
 		console.log("Database Name:", mongoose.connection.name);
-		
+
 		// Handle connection events
-		mongoose.connection.on('disconnected', () => {
-			console.log('MongoDB disconnected');
+		mongoose.connection.on("disconnected", () => {
+			console.log("MongoDB disconnected");
 			isConnected = false;
 		});
-		
-		mongoose.connection.on('error', (err) => {
-			console.error('MongoDB connection error:', err);
+
+		mongoose.connection.on("error", (err) => {
+			console.error("MongoDB connection error:", err);
 			isConnected = false;
 		});
-		
 	} catch (error) {
 		console.error("MongoDB connection error:", error.message);
 		console.error("Please check:");

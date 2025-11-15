@@ -8,7 +8,7 @@ const ensureDBConnection = async (req, res, next) => {
 		console.error("Database connection failed:", error);
 		res.status(503).json({
 			message: "Database connection unavailable. Please try again later.",
-			error: error.message
+			error: error.message,
 		});
 	}
 };
