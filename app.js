@@ -9,6 +9,9 @@ require("dotenv").config();
 const initGoogle = require("./src/passport/googleStrategy");
 initGoogle();
 
+// Import DB middleware
+const ensureDBConnection = require("./src/middleware/dbMiddleware");
+
 const authRoutes = require("./src/routes/authRoutes");
 const bookRoutes = require("./src/routes/bookRoutes");
 const roomRoutes = require("./src/routes/roomRoutes");
@@ -43,6 +46,9 @@ app.use(cookieParser());
 
 // initialize passport
 app.use(passport.initialize());
+
+// Ensure DB connection before handling requests
+app.use(ensureDBConnection);
 
 // routes
 app.use("/api/auth", authRoutes);
