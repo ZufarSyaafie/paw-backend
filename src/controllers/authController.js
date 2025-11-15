@@ -11,6 +11,22 @@ const {
 const SALT_ROUNDS = 10;
 const asyncHandler = require("express-async-handler");
 
+// Cookie helpers
+const isProd = process.env.NODE_ENV === "production";
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "token";
+
+function getCookieOptions() {
+	// default 7 days
+	const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+	return {
+		httpOnly: true,
+		secure: isProd, // must be true for SameSite=None on HTTPS
+		sameSite: isProd ? "none" : "lax",
+		maxAge: sevenDaysMs,
+		path: "/",
+	};
+}
+
 exports.register = asyncHandler(async (req, res) => {
 	const { name, email, password } = req.body;
 	if (!email || !password)
@@ -34,19 +50,19 @@ exports.register = asyncHandler(async (req, res) => {
 		otpExpiration,
 	});
 
-    let demoOtpForFallback = null;
+	let demoOtpForFallback = null;
 	try {
-	    await sendOTPEmail(email, otp, "verification");
-    } catch (err) {
-        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
-        demoOtpForFallback = otp; 
-    }
+		await sendOTPEmail(email, otp, "verification");
+	} catch (err) {
+		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		demoOtpForFallback = otp;
+	}
 
 	res.json({
 		message: "Registration initiated.",
 		email: user.email,
 		requiresOTP: true,
-        demoOtp: demoOtpForFallback 
+		demoOtp: demoOtpForFallback,
 	});
 });
 
@@ -70,19 +86,19 @@ exports.login = asyncHandler(async (req, res) => {
 		otpExpiration,
 	});
 
-    let demoOtpForFallback = null;
+	let demoOtpForFallback = null;
 	try {
-	    await sendOTPEmail(email, otp, "login");
-    } catch (err) {
-        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
-        demoOtpForFallback = otp;
-    }
+		await sendOTPEmail(email, otp, "login");
+	} catch (err) {
+		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		demoOtpForFallback = otp;
+	}
 
 	res.json({
 		message: "Login credentials verified.",
 		email: user.email,
 		requiresOTP: true,
-        demoOtp: demoOtpForFallback
+		demoOtp: demoOtpForFallback,
 	});
 });
 
@@ -111,7 +127,11 @@ exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
+		authMethod: 'local',
 	});
+
+	// set httpOnly cookie for auth
+	res.cookie(COOKIE_NAME, token, getCookieOptions());
 
 	res.json({
 		message: "Registration completed successfully. You are now logged in.",
@@ -146,7 +166,11 @@ exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
+		authMethod: 'local',
 	});
+
+	// set httpOnly cookie for auth
+	res.cookie(COOKIE_NAME, token, getCookieOptions());
 
 	res.json({
 		message: "Login successful",
@@ -172,17 +196,17 @@ exports.resendRegistrationOTP = asyncHandler(async (req, res) => {
 	const otpExpiration = generateOTPExpiration();
 	await User.findByIdAndUpdate(user._id, { otp, otpExpiration });
 
-    let demoOtpForFallback = null;
-    try {
-	    await sendOTPEmail(email, otp, "verification");
-    } catch (err) {
-        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
-        demoOtpForFallback = otp;
-    }
+	let demoOtpForFallback = null;
+	try {
+		await sendOTPEmail(email, otp, "verification");
+	} catch (err) {
+		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		demoOtpForFallback = otp;
+	}
 
 	res.json({
 		message: "OTP 'resent' (DEMO MODE).",
-        demoOtp: demoOtpForFallback
+		demoOtp: demoOtpForFallback,
 	});
 });
 
@@ -196,26 +220,35 @@ exports.resendLoginOTP = asyncHandler(async (req, res) => {
 	const otpExpiration = generateOTPExpiration();
 	await User.findByIdAndUpdate(user._id, { otp, otpExpiration });
 
-    let demoOtpForFallback = null;
-    try {
-	    await sendOTPEmail(email, otp, "login");
-    } catch (err) {
-        console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
-        demoOtpForFallback = otp;
-    }
+	let demoOtpForFallback = null;
+	try {
+		await sendOTPEmail(email, otp, "login");
+	} catch (err) {
+		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		demoOtpForFallback = otp;
+	}
 
 	res.json({
 		message: "Login OTP 'resent' (DEMO MODE).",
-        demoOtp: demoOtpForFallback
+		demoOtp: demoOtpForFallback,
 	});
 });
 
 exports.googleCallbackSuccess = (req, res) => {
 	if (!req.user) return res.status(500).send("No user data from Google OAuth");
 	const token = req.user.token;
+	// set httpOnly cookie for auth
+	res.cookie(COOKIE_NAME, token, getCookieOptions());
 	const redirectUrl = process.env.FRONTEND_SUCCESS_REDIRECT;
 	if (redirectUrl) {
+		// Keep token in query for backward-compatibility, but cookie is now primary
 		return res.redirect(`${redirectUrl}?token=${token}`);
 	}
 	res.json({ token });
 };
+
+exports.logout = asyncHandler(async (req, res) => {
+	// Clear cookie using same attributes
+	res.clearCookie(COOKIE_NAME, getCookieOptions());
+	res.json({ message: "Logged out" });
+});

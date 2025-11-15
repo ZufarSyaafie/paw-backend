@@ -19,21 +19,23 @@ const loanRoutes = require("./src/routes/loanRoutes");
 
 const app = express();
 const allowedOrigins = [
-	'http://localhost:3000',
-	'https://naratama.netlify.app',
-	'https://perpus-naratama.netlify.app'
+	"http://localhost:3000",
+	"https://naratama.netlify.app",
+	"https://perpus-naratama.netlify.app",
 ];
 
-app.use(cors({ 
-  origin: (origin, callback) => {
-	  if (allowedOrigins.includes(origin) || !origin) {
-		  callback(null, true);
-	  } else {
-		  callback (new Error('Not allowed by CORS'));
-	  }
-  },
-  credentials: true 
-}));
+app.use(
+	cors({
+		origin: (origin, callback) => {
+			if (allowedOrigins.includes(origin) || !origin) {
+				callback(null, true);
+			} else {
+				callback(new Error("Not allowed by CORS"));
+			}
+		},
+		credentials: true,
+	})
+);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -56,14 +58,14 @@ app.get("/", (req, res) => res.send("Perpustakaan API running"));
 
 app.use((err, req, res, next) => {
 	console.error(err.stack); // log errornya di server
-	
+
 	const statusCode = err.status || 500;
 	const message = err.message || "Terjadi kesalahan pada server";
 
 	res.status(statusCode).json({
 		message: message,
 		// Kalo lagi development, kirim stack trace-nya
-		stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+		stack: process.env.NODE_ENV === "production" ? null : err.stack,
 	});
 });
 

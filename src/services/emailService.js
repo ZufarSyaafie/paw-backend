@@ -1,4 +1,5 @@
 const { Resend } = require("resend");
+const { Resend } = require("resend");
 const User = require("../models/User");
 
 // Initialize Resend client
