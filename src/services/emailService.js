@@ -1,15 +1,27 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const User = require("../models/User");
 
-// Create transporter for sending emails
-const createTransporter = () => {
-	return nodemailer.createTransport({
-		service: "gmail", // or your preferred email service
-		auth: {
-			user: process.env.EMAIL_USER,
-			pass: process.env.EMAIL_PASS, // Use App Password for Gmail
-		},
-	});
+// Initialize Resend client
+const getResendClient = () => {
+	const apiKey = process.env.RESEND_API_KEY;
+	if (!apiKey) {
+		throw new Error(
+			"Missing RESEND_API_KEY. Set it in your environment to enable email sending via Resend."
+		);
+	}
+	return new Resend(apiKey);
+};
+
+// Resolve FROM address for emails
+const getFromAddress = () => {
+	// Prefer EMAIL_FROM, fallback to legacy EMAIL_USER for backward compatibility
+	const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+	if (!from) {
+		throw new Error(
+			"Missing EMAIL_FROM (or EMAIL_USER). Set a verified sender, e.g., 'Perpustakaan Naratama <notifications@your-domain.com>'."
+		);
+	}
+	return from;
 };
 
 // Send announcement email to all registered users
@@ -26,18 +38,16 @@ const sendAnnouncementToAllUsers = async (announcement) => {
 			return { success: true, sent: 0 };
 		}
 
-		const transporter = createTransporter();
+		const resend = getResendClient();
+		const from = getFromAddress();
 		let successCount = 0;
 		let failureCount = 0;
 
 		// Send email to each user
 		for (const user of users) {
 			try {
-				const mailOptions = {
-					from: process.env.EMAIL_USER,
-					to: user.email,
-					subject: `📚 Pengumuman Baru: ${announcement.bookTitle}`,
-					html: `
+				const subject = `📚 Pengumuman Baru: ${announcement.bookTitle}`;
+				const html = `
 						<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 							<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
 								<h1 style="color: white; margin: 0; font-size: 28px;">📚 Perpustakaan Naratama</h1>
@@ -68,10 +78,14 @@ const sendAnnouncementToAllUsers = async (announcement) => {
 								</p>
 							</div>
 						</div>
-					`,
-				};
+					`;
 
-				await transporter.sendMail(mailOptions);
+				await resend.emails.send({
+					from,
+					to: user.email,
+					subject,
+					html,
+				});
 				successCount++;
 				console.log(`Announcement sent to ${user.email}`);
 			} catch (error) {
@@ -112,18 +126,16 @@ const sendCustomAnnouncementToAllUsers = async (title, message) => {
 			return { success: true, sent: 0 };
 		}
 
-		const transporter = createTransporter();
+		const resend = getResendClient();
+		const from = getFromAddress();
 		let successCount = 0;
 		let failureCount = 0;
 
 		// Send email to each user
 		for (const user of users) {
 			try {
-				const mailOptions = {
-					from: process.env.EMAIL_USER,
-					to: user.email,
-					subject: `📢 Pengumuman: ${title}`,
-					html: `
+				const subject = `📢 Pengumuman: ${title}`;
+				const html = `
 						<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 							<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
 								<h1 style="color: white; margin: 0; font-size: 28px;">📢 Perpustakaan Naratama</h1>
@@ -154,10 +166,14 @@ const sendCustomAnnouncementToAllUsers = async (title, message) => {
 								</p>
 							</div>
 						</div>
-					`,
-				};
+						`;
 
-				await transporter.sendMail(mailOptions);
+				await resend.emails.send({
+					from,
+					to: user.email,
+					subject,
+					html,
+				});
 				successCount++;
 				console.log(`Custom announcement sent to ${user.email}`);
 			} catch (error) {
