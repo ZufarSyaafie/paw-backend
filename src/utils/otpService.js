@@ -1,26 +1,38 @@
-const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const { Resend } = require("resend");
 
 // Generate 6-digit OTP
 const generateOTP = () => {
 	return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Create transporter for sending emails
-const createTransporter = () => {
-	return nodemailer.createTransport({
-		service: "gmail", // or your preferred email service
-		auth: {
-			user: process.env.EMAIL_USER,
-			pass: process.env.EMAIL_PASS, // Use App Password for Gmail
-		},
-	});
+// Initialize Resend client
+const getResendClient = () => {
+	const apiKey = process.env.RESEND_API_KEY;
+	if (!apiKey) {
+		throw new Error(
+			"Missing RESEND_API_KEY. Set it in your environment to enable email sending via Resend."
+		);
+	}
+	return new Resend(apiKey);
+};
+
+// Resolve FROM address for emails
+const getFromAddress = () => {
+	const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+	if (!from) {
+		throw new Error(
+			"Missing EMAIL_FROM (or EMAIL_USER). Set a verified sender for Resend."
+		);
+	}
+	return from;
 };
 
 // Send OTP via email
 const sendOTPEmail = async (email, otp, type = "verification") => {
 	try {
-		const transporter = createTransporter();
+		const resend = getResendClient();
+		const from = getFromAddress();
 
 		const subject =
 			type === "login" ? "Login Verification Code" : "Email Verification Code";
@@ -29,11 +41,7 @@ const sendOTPEmail = async (email, otp, type = "verification") => {
 				? `Your login verification code is: ${otp}. This code will expire in 10 minutes.`
 				: `Your verification code is: ${otp}. This code will expire in 10 minutes.`;
 
-		const mailOptions = {
-			from: process.env.EMAIL_USER,
-			to: email,
-			subject: subject,
-			html: `
+		const html = `
 				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
 					<h2 style="color: #333;">Perpustakaan Naratama</h2>
 					<p style="font-size: 16px;">${message}</p>
@@ -44,10 +52,14 @@ const sendOTPEmail = async (email, otp, type = "verification") => {
 						If you didn't request this code, please ignore this email.
 					</p>
 				</div>
-			`,
-		};
+			`;
 
-		await transporter.sendMail(mailOptions);
+		await resend.emails.send({
+			from,
+			to: email,
+			subject,
+			html,
+		});
 		console.log(`OTP sent to ${email}`);
 		return true;
 	} catch (error) {
