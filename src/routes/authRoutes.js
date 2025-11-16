@@ -15,6 +15,10 @@ router.post("/verify-login-otp", authController.verifyLoginOTP);
 router.post("/resend-registration-otp", authController.resendRegistrationOTP);
 router.post("/resend-login-otp", authController.resendLoginOTP);
 
+// Forgot Password
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
+
 // logout
 router.post("/logout", authController.logout);
 
