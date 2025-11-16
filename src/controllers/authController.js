@@ -127,7 +127,7 @@ exports.verifyRegistrationOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
-		authMethod: 'local',
+		authMethod: "local",
 	});
 
 	// set httpOnly cookie for auth
@@ -166,7 +166,7 @@ exports.verifyLoginOTP = asyncHandler(async (req, res) => {
 		id: user._id,
 		email: user.email,
 		role: user.role,
-		authMethod: 'local',
+		authMethod: "local",
 	});
 
 	// set httpOnly cookie for auth
@@ -251,4 +251,80 @@ exports.logout = asyncHandler(async (req, res) => {
 	// Clear cookie using same attributes
 	res.clearCookie(COOKIE_NAME, getCookieOptions());
 	res.json({ message: "Logged out" });
+});
+
+exports.forgotPassword = asyncHandler(async (req, res) => {
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ message: "Email required" });
+
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
+
+	// Check if user has password (not Google OAuth user)
+	if (!user.password) {
+		return res.status(400).json({
+			message: "This account uses Google login. Please use Google to sign in.",
+		});
+	}
+
+	const otp = generateOTP();
+	const otpExpiration = generateOTPExpiration();
+
+	await User.findByIdAndUpdate(user._id, {
+		otp,
+		otpExpiration,
+	});
+
+	let demoOtpForFallback = null;
+	try {
+		await sendOTPEmail(email, otp, "reset-password");
+	} catch (err) {
+		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		demoOtpForFallback = otp;
+	}
+
+	res.json({
+		message: "Password reset OTP sent to your email.",
+		email: user.email,
+		demoOtp: demoOtpForFallback,
+	});
+});
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+	const { email, otp, newPassword } = req.body;
+
+	if (!email || !otp || !newPassword) {
+		return res.status(400).json({
+			message: "Email, OTP, and new password are required",
+		});
+	}
+
+	if (newPassword.length < 6) {
+		return res.status(400).json({
+			message: "Password must be at least 6 characters long",
+		});
+	}
+
+	const user = await User.findOne({ email });
+	if (!user) return res.status(404).json({ message: "User not found" });
+
+	const otpValidation = validateOTP(user.otp, user.otpExpiration, otp);
+	if (!otpValidation.isValid) {
+		return res.status(400).json({ message: otpValidation.message });
+	}
+
+	// Hash new password
+	const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+	// Update password and clear OTP
+	await User.findByIdAndUpdate(user._id, {
+		password: hash,
+		otp: undefined,
+		otpExpiration: undefined,
+	});
+
+	res.json({
+		message:
+			"Password has been reset successfully. You can now login with your new password.",
+	});
 });
