@@ -25,6 +25,7 @@ const allowedOrigins = [
 	"http://localhost:3000",
 	"https://naratama.netlify.app",
 	"https://perpus-naratama.netlify.app",
+	"https://perpustakaan-naratama.vercel.app",
 ];
 
 app.use(
