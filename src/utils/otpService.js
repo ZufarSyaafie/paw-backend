@@ -22,12 +22,18 @@ const sendOTPEmail = async (email, otp, type = "verification") => {
 	try {
 		const transporter = createTransporter();
 
-		const subject =
-			type === "login" ? "Login Verification Code" : "Email Verification Code";
-		const message =
-			type === "login"
-				? `Your login verification code is: ${otp}. This code will expire in 10 minutes.`
-				: `Your verification code is: ${otp}. This code will expire in 10 minutes.`;
+		let subject, message;
+
+		if (type === "login") {
+			subject = "Login Verification Code";
+			message = `Your login verification code is: ${otp}. This code will expire in 10 minutes.`;
+		} else if (type === "reset-password") {
+			subject = "Reset Password Verification Code";
+			message = `Your password reset verification code is: ${otp}. This code will expire in 10 minutes.`;
+		} else {
+			subject = "Email Verification Code";
+			message = `Your verification code is: ${otp}. This code will expire in 10 minutes.`;
+		}
 
 		const mailOptions = {
 			from: process.env.EMAIL_USER,
