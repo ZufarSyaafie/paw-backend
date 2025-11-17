@@ -73,6 +73,7 @@ exports.createBook = asyncHandler(async (req, res) => {
 	const book = await Book.create(payload);
 
 	const announcement = await Announcement.create({
+		title: `Buku Baru: ${book.title}`,
 		bookTitle: book.title,
 		message: `Buku baru: "${book.title}" oleh ${book.author || "Unknown author"} sekarang tersedia.`,
 	});
