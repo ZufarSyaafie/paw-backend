@@ -14,6 +14,8 @@ router.get("/status", verifyToken, loansController.checkLoanByBookId);
 // return a loan (user or admin)
 router.post("/:id/return", verifyToken, loansController.returnLoan);
 
+router.delete("/:id/cancel", verifyToken, loansController.cancelLoan); 
+
 // get loan by id (user owns or admin)
 router.get("/:id", verifyToken, loansController.getLoanById);
 

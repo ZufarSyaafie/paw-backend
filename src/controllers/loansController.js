@@ -143,3 +143,27 @@ exports.checkLoanByBookId = asyncHandler(async (req, res) => {
       dueDate: loan.dueDate,
   });
 });
+
+exports.cancelLoan = asyncHandler(async (req, res) => {
+  const loanId = req.params.id;
+  const loan = await Loan.findById(loanId);
+  
+  if (!loan) {
+    return res.status(404).json({ message: "Loan not found" });
+  }
+
+  // Cek ownership (user yang punya atau admin)
+  if (req.user.role !== "admin" && loan.user.toString() !== req.user.id) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  // Cuma bisa cancel kalo belum bayar
+  if (loan.paymentStatus === "paid") {
+    return res.status(400).json({ message: "Cannot cancel paid loan. Please return the book instead." });
+  }
+
+  // Hapus loan (karena belum bayar, stock ga perlu dikembaliin)
+  await Loan.findByIdAndDelete(loanId);
+
+  res.json({ message: "Loan cancelled successfully" });
+});
