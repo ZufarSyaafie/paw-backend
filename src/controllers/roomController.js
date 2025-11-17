@@ -1,6 +1,6 @@
 const Room = require("../models/Room");
 const Booking = require("../models/Booking");
-const snap = require("../services/midtrans");
+const { snap } = require("../services/midtrans");
 const { isWeekend, parseISO, differenceInHours } = require("date-fns");
 const {
 	isWorkingDay,
