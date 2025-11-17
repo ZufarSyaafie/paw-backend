@@ -15,7 +15,13 @@ const timeToMinutes = (time) => {
 	const [h, m] = time.split(':').map(Number);
 	return h * 60 + m;
 };
-
+const getDayRange = (date) => {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0); // Mulai jam 00:00
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1); // Sampai hari berikutnya jam 00:00
+    return { $gte: start, $lt: end };
+};
 exports.listRooms = asyncHandler(async (req, res) => {
     const rooms = await Room.find().lean();
     
@@ -24,8 +30,8 @@ exports.listRooms = asyncHandler(async (req, res) => {
     todayStart.setHours(0, 0, 0, 0); 
 
     const confirmedBookingsToday = await Booking.find({
-        status: "confirmed",
-        date: todayStart,
+        status: { $in: ["pending_payment", "confirmed"] },
+        date: getDayRange(todayStart),
     });
     const activeRoomIds = new Set();
     const bufferMinutes = 30; 
@@ -93,13 +99,12 @@ exports.getBookings = asyncHandler(async (req, res) => {
 
     if (roomId) filter.room = roomId;
     if (date) {
-        const d = parseISO(date);
-        filter.date = d;
+        filter.date = getDayRange(parseISO(date));
     }
 
     const bookings = await Booking.find(filter)
         .populate("user", "name email")
-        .populate("room", "name capacity photos")
+        .populate("room", "name capacity photos facilities")
         .sort({ date: 1, startTime: 1 });
 
     res.json(bookings);
@@ -268,7 +273,6 @@ exports.bookRoom = asyncHandler(async (req, res) => {
 
         const orderId = `booking-${booking._id}`;
         booking.midtransOrderId = orderId;
-        await booking.save();
 
         const parameter = {
             transaction_details: {
@@ -278,13 +282,17 @@ exports.bookRoom = asyncHandler(async (req, res) => {
             customer_details: { email: req.user.email },
             item_details: [{
                 id: room._id, 
-                price: room.price,
-                quantity: duration,
+                price: totalPrice,
+                quantity: 1,
                 name: `Booking ${room.name} (${duration} jam)`,
             }]
         };
+
         const transaction = await snap.createTransaction(parameter);
         
+        booking.paymentUrl = transaction.redirect_url;
+        await booking.save();
+
         res.status(201).json({
             message: "Ruangan berhasil dipesan, silakan lanjutkan ke pembayaran",
             booking, 

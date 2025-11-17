@@ -11,6 +11,7 @@ const bookingSchema = new mongoose.Schema({
 
 	totalPrice: { type: Number, required: true },
 	midtransOrderId: { type: String },
+	paymentUrl: { type: String },
 	paymentStatus: {
 		type: String,
 		enum: ["unpaid", "paid", "failed"],
