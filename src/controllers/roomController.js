@@ -99,7 +99,7 @@ exports.getBookings = asyncHandler(async (req, res) => {
 
     const bookings = await Booking.find(filter)
         .populate("user", "name email")
-        .populate("room", "name capacity")
+        .populate("room", "name capacity photos")
         .sort({ date: 1, startTime: 1 });
 
     res.json(bookings);
@@ -157,6 +157,9 @@ exports.bookRoom = asyncHandler(async (req, res) => {
         });
     }
     const d = parseISO(date);
+    const dayStart = d;
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1)
     if (isNaN(d.getTime())) {
         return res.status(400).json({
             message: "Format tanggal tidak valid. Gunakan format YYYY-MM-DD",
@@ -216,7 +219,10 @@ exports.bookRoom = asyncHandler(async (req, res) => {
     
     const existingBookings = await Booking.find({
         room: roomId,
-        date: d,
+        date: {
+            $gte: dayStart,
+            $lt: dayEnd
+        },
         status: { $in: ["pending_payment", "confirmed"] },
     });
     
