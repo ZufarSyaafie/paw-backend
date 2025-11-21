@@ -146,7 +146,7 @@ exports.checkLoanByBookId = asyncHandler(async (req, res) => {
 
 exports.cancelLoan = asyncHandler(async (req, res) => {
   const loanId = req.params.id;
-  const loan = await Loan.findById(loanId);
+  const loan = await Loan.findById('book');
   
   if (!loan) {
     return res.status(404).json({ message: "Loan not found" });
@@ -158,12 +158,15 @@ exports.cancelLoan = asyncHandler(async (req, res) => {
   }
 
   // Cuma bisa cancel kalo belum bayar
-  if (loan.paymentStatus === "paid") {
-    return res.status(400).json({ message: "Cannot cancel paid loan. Please return the book instead." });
+  if (loan.paymentStatus === "paid" && loan.book) {
+    await Book.findByIdAndUpdate(loan.book._id, { $inc: { stock: 1 } });
+    await Loan.findByIdAndDelete(loanId);
+    return res.json({ message: "Paid loan successfully cancelled and stock restored." });
+  } else if (loan.paymentStatus === "unpaid" || loan.paymentStatus === "failed") {
+    await Loan.findByIdAndDelete(loanId);
+    return res.json({ message: "Unpaid loan successfully cancelled." });
+  } else {
+    return res.status(400).json({ message: "Cannot cancel loan in current status." });
   }
 
-  // Hapus loan (karena belum bayar, stock ga perlu dikembaliin)
-  await Loan.findByIdAndDelete(loanId);
-
-  res.json({ message: "Loan cancelled successfully" });
 });
