@@ -146,7 +146,7 @@ exports.checkLoanByBookId = asyncHandler(async (req, res) => {
 
 exports.cancelLoan = asyncHandler(async (req, res) => {
   const loanId = req.params.id;
-  const loan = await Loan.findById('book');
+  const loan = await Loan.findById(loanId).populate('book');
   
   if (!loan) {
     return res.status(404).json({ message: "Loan not found" });
