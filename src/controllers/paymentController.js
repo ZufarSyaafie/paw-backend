@@ -90,7 +90,7 @@ exports.notification = asyncHandler(async (req, res) => {
 			await booking.save();
 			console.log("Booking updated:", booking);
 		} else {
-			console.warn("Notificatino for unknown orderId prefix:", orderId);
+			console.warn("Notification for unknown orderId prefix:", orderId);
 		}
 
 		// ⚠️ Selalu kasih response 200 OK ke Midtrans
@@ -128,7 +128,7 @@ exports.listMyPayments = asyncHandler(async (req, res) => {
             // Mapping status BE -> FE
             status: loan.paymentStatus === 'paid' ? 'completed' : 'pending',
             paymentMethod: "midtrans", // Asumsi
-            description: `Deposit Buku: ${loan.book?.title || 'Buku Dihapus'}`,
+            description: `Book Deposit: ${loan.book?.title || 'Book deleted'}`,
             transactionId: loan.midtransOrderId,
             type: "loan_deposit",
             createdAt: loan.borrowedAt, // Pake tanggal pinjam
@@ -141,7 +141,7 @@ exports.listMyPayments = asyncHandler(async (req, res) => {
             amount: booking.totalPrice,
             status: booking.paymentStatus === 'paid' ? 'completed' : (booking.paymentStatus === 'failed' ? 'failed' : 'pending'),
             paymentMethod: "midtrans", // Asumsi
-            description: `Booking Ruangan: ${booking.room?.name || 'Ruangan Dihapus'}`,
+            description: `Room booking: ${booking.room?.name || 'Room deleted'}`,
             transactionId: booking.midtransOrderId,
             type: "room_booking",
             createdAt: booking.createdAt, 

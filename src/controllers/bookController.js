@@ -82,7 +82,7 @@ exports.createBook = asyncHandler(async (req, res) => {
 		const emailResult = await sendAnnouncementToAllUsers(announcement);
 		console.log(`Email announcement sent to ${emailResult.sent} users`);
 	} catch (emailError) {
-		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to send announcement emails:", emailError.message);
+		console.error("EMAIL FAILED (ETIMEDOUT): Failed to send announcement emails:", emailError.message);
 	}
 
 	res.status(201).json(book);
@@ -121,7 +121,7 @@ exports.borrowBook = asyncHandler(async (req, res) => {
 	const loan = await Loan.create({
 		user: new mongoose.Types.ObjectId(userId),
 		book: new mongoose.Types.ObjectId(bookId),
-		dueDate: dueDate, // <-- INI FIX-NYA
+		dueDate: dueDate, 
 		depositAmount: 25000,
 		paymentStatus: "unpaid",
 		refundStatus: "pending",

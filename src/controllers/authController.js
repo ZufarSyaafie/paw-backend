@@ -28,7 +28,7 @@ function getCookieOptions() {
 }
 
 exports.register = asyncHandler(async (req, res) => {
-	const { name, email, password } = req.body;
+	const { name, email, password, phone } = req.body;
 	if (!email || !password)
 		return res.status(400).json({ message: "Email & password required" });
 
@@ -43,6 +43,7 @@ exports.register = asyncHandler(async (req, res) => {
 	const user = await User.create({
 		name,
 		email,
+		phone,
 		password: hash,
 		role: "user",
 		isVerified: false,
@@ -90,7 +91,7 @@ exports.login = asyncHandler(async (req, res) => {
 	try {
 		await sendOTPEmail(email, otp, "login");
 	} catch (err) {
-		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		console.error("EMAIL FAILED (ETIMEDOUT), pake fallback demoOtp.");
 		demoOtpForFallback = otp;
 	}
 
@@ -200,7 +201,7 @@ exports.resendRegistrationOTP = asyncHandler(async (req, res) => {
 	try {
 		await sendOTPEmail(email, otp, "verification");
 	} catch (err) {
-		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		console.error("EMAIL FAILED (ETIMEDOUT), fallback demoOtp.");
 		demoOtpForFallback = otp;
 	}
 
@@ -224,7 +225,7 @@ exports.resendLoginOTP = asyncHandler(async (req, res) => {
 	try {
 		await sendOTPEmail(email, otp, "login");
 	} catch (err) {
-		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		console.error("EMAIL FAILED (ETIMEDOUT), fallback demoOtp.");
 		demoOtpForFallback = otp;
 	}
 
@@ -279,7 +280,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 	try {
 		await sendOTPEmail(email, otp, "reset-password");
 	} catch (err) {
-		console.error("EMAIL GAGAL (ETIMEDOUT), pake fallback demoOtp.");
+		console.error("EMAIL FAILED (ETIMEDOUT), fallback demoOtp.");
 		demoOtpForFallback = otp;
 	}
 

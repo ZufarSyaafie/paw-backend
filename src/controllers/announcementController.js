@@ -12,7 +12,7 @@ exports.listAnnouncements = asyncHandler(async (req, res) => {
 
 exports.createAnnouncement = asyncHandler(async (req, res) => {
 	// (admin only route - enforced by middleware)
-	const { title, message } = req.body; // Pake 'title' yg udah kita benerin
+	const { title, message } = req.body;
 
 	if (!title || !message) {
 		return res.status(400).json({
@@ -43,7 +43,7 @@ exports.createAnnouncement = asyncHandler(async (req, res) => {
 		};
 	} catch (emailError) {
         // Silent Fail
-		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to send custom announcement:", emailError.message);
+		console.error("EMAIL FAILED (ETIMEDOUT): Failed to send custom announcement:", emailError.message);
 		emailResultStatus = {
 			sent: 0,
 			failed: 0,
@@ -88,7 +88,7 @@ exports.sendAnnouncementEmails = asyncHandler(async (req, res) => {
 			},
 		});
 	} catch (emailError) {
-		console.error("EMAIL GAGAL (ETIMEDOUT): Failed to resend announcement emails:", emailError.message);
+		console.error("EMAIL FAILED (ETIMEDOUT): Failed to resend announcement emails:", emailError.message);
         // Kalo gagal, kirim 500 tapi kasih tau emailnya
 		res.status(500).json({
 			message: "Failed to send announcement emails (Service Error)",

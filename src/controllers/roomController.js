@@ -115,12 +115,12 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     const booking = await Booking.findById(bookingId);
 
     if (!booking) {
-        return res.status(404).json({ message: "Booking tidak ditemukan" });
+        return res.status(404).json({ message: "Booking not found" });
     }
 
     if (booking.user.toString() !== req.user.id && req.user.role !== "admin") {
         return res.status(403).json({
-            message: "Anda tidak memiliki izin untuk membatalkan booking ini",
+            message: "You do not have permission to cancel this booking",
         });
     }
 
@@ -134,7 +134,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     if (hoursUntilBooking < 2 && req.user.role !== "admin") {
         return res.status(400).json({
             message:
-                "Booking hanya dapat dibatalkan minimal 2 jam sebelum waktu mulai",
+                "Bookings can only be canceled at least 2 hours before the start time",
         });
     }
 
@@ -143,7 +143,7 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     await booking.save();
 
     res.json({
-        message: "Booking berhasil dibatalkan",
+        message: "Booking successfully canceled",
         booking,
     });
 });
@@ -152,13 +152,13 @@ exports.bookRoom = asyncHandler(async (req, res) => {
     const { date, startTime, endTime, phone } = req.body;
     if (!date || !startTime || !endTime || !phone) {
         return res.status(400).json({
-            message: "date, startTime, endTime, dan phone wajib diisi",
+            message: "date, startTime, endTime, and phone are required",
         });
     }
     if (!validatePhoneNumber(phone)) {
         return res.status(400).json({
             message:
-                "Format nomor telepon tidak valid. Gunakan format Indonesia (08xxxxxxxxx)",
+                "The phone number format is invalid. Use the Indonesian format (08xxxxxxxxx)",
         });
     }
     const d = parseISO(date);
@@ -167,26 +167,26 @@ exports.bookRoom = asyncHandler(async (req, res) => {
     dayEnd.setDate(dayEnd.getDate() + 1)
     if (isNaN(d.getTime())) {
         return res.status(400).json({
-            message: "Format tanggal tidak valid. Gunakan format YYYY-MM-DD",
+            message: "Invalid date format. Use the format YYYY-MM-DD",
         });
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (d < today) {
         return res.status(400).json({
-            message: "Tidak dapat memesan ruangan untuk tanggal yang sudah lewat",
+            message: "Cannot book a room for a past date",
         });
     }
     if (!isWorkingDay(d)) {
         return res.status(400).json({
             message:
-                "Peminjaman ruangan hanya tersedia pada hari kerja (Senin-Jumat)",
+                "Room bookings are only available on weekdays (Monday-Friday)",
         });
     }
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
         return res.status(400).json({
-            message: "Format waktu tidak valid. Gunakan format HH:MM (24 jam)",
+            message: "Invalid time format. Use the HH:MM (24-hour) format",
         });
     }
     
@@ -194,31 +194,31 @@ exports.bookRoom = asyncHandler(async (req, res) => {
     const [endMin] = endTime.split(":").map(Number).slice(-1);
     if (startMin % 30 !== 0 || endMin % 30 !== 0) {
       return res.status(400).json({
-        message: "Waktu peminjaman harus dalam kelipatan 30 menit.",
+        message: "The booking time must be in 30-minute increments.",
       });
     }
 
     const duration = calculateDurationHours(startTime, endTime);
     if (duration < 1) { 
         return res.status(400).json({
-            message: "Durasi peminjaman minimal 1 jam",
+            message: "The minimum booking duration is 1 hour",
         });
     }
     if (!isWithinOperatingHours(startTime, endTime)) {
         return res.status(400).json({
-            message: "Jam operasional ruangan: 08:00 - 17:00",
+            message: "Room operating hours: 08:00 - 17:00",
         });
     }
 
     const roomId = req.params.id;
     const room = await Room.findById(roomId);
     if (!room) {
-        return res.status(404).json({ message: "Ruangan tidak ditemukan" });
+        return res.status(404).json({ message: "Room not found." });
     }
     
     if (room.status === 'maintenance') {
       return res.status(400).json({
-        message: "Ruangan ini tidak tersedia karena sedang dalam perbaikan/maintenance.",
+        message: "This room is not available because it is under repair/maintenance.",
       });
     }
     
@@ -252,7 +252,7 @@ exports.bookRoom = asyncHandler(async (req, res) => {
 
     if (isConflict) {
         return res.status(400).json({
-            message: `Konflik jadwal. Ruangan sudah dipesan, termasuk waktu buffer ${bufferMinutes} menit untuk pembersihan.`,
+            message: `Schedule conflict. The room has already been booked, including a ${bufferMinutes}-minute buffer for cleaning.`,
         });
     }
 
@@ -284,7 +284,7 @@ exports.bookRoom = asyncHandler(async (req, res) => {
                 id: room._id, 
                 price: totalPrice,
                 quantity: 1,
-                name: `Booking ${room.name} (${duration} jam)`,
+                name: `Booking ${room.name} (${duration} hrs)`,
             }]
         };
 
@@ -294,7 +294,7 @@ exports.bookRoom = asyncHandler(async (req, res) => {
         await booking.save();
 
         res.status(201).json({
-            message: "Ruangan berhasil dipesan, silakan lanjutkan ke pembayaran",
+            message: "The room has been successfully booked, please proceed to payment.",
             booking, 
             payment_url: transaction.redirect_url, 
         });
@@ -316,7 +316,7 @@ exports.bookRoom = asyncHandler(async (req, res) => {
             .populate("room", "name capacity");
 
         res.status(201).json({
-            message: "Ruangan berhasil dipesan (gratis)",
+            message: "Room successfully booked (free)",
             booking: populatedBooking,
             payment_url: null,
         });
